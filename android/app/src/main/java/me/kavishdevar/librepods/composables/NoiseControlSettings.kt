@@ -189,6 +189,7 @@ fun NoiseControlSettings(
         ),
         modifier = Modifier.padding(8.dp, bottom = 2.dp)
     )
+    @Suppress("COMPOSE_APPLIER_CALL_MISMATCH")
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -437,7 +438,7 @@ fun NoiseControlSettings(
     }
 }
 
-@Preview()
+@Preview
 @Composable
 fun NoiseControlSettingsPreview() {
     NoiseControlSettings(AirPodsService())

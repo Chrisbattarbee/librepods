@@ -1,17 +1,17 @@
 /*
  * LibrePods - AirPods liberated from Apple’s ecosystem
- * 
+ *
  * Copyright (C) 2025 LibrePods contributors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
@@ -19,31 +19,28 @@
 package me.kavishdevar.librepods.composables
 
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.content.res.Configuration
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -51,85 +48,78 @@ import androidx.compose.ui.unit.sp
 import me.kavishdevar.librepods.R
 
 @Composable
-fun BatteryIndicator(batteryPercentage: Int, charging: Boolean = false) {
-    val batteryOutlineColor = Color(0xFFBFBFBF)
-    val batteryFillColor = if (batteryPercentage > 30) Color(0xFF30D158) else Color(0xFFFC3C3C)
-    val batteryTextColor = MaterialTheme.colorScheme.onSurface
+fun BatteryIndicator(
+    batteryPercentage: Int,
+    charging: Boolean = false,
+    prefix: String = "",
+    previousCharging: Boolean = false,
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color.Black else Color(0xFFF2F2F7)
+    val batteryTextColor = if (isDarkTheme) Color.White else Color.Black
+    val batteryFillColor = if (batteryPercentage > 25)
+        if (isDarkTheme) Color(0xFF2ED158) else Color(0xFF35C759)
+        else if (isDarkTheme) Color(0xFFFC4244) else Color(0xFFfe373C)
 
-    val batteryWidth = 40.dp
-    val batteryHeight = 15.dp
-    val batteryCornerRadius = 4.dp
-    val tipWidth = 5.dp
-    val tipHeight = batteryHeight * 0.375f
+    val initialScale = if (previousCharging) 1f else 0f
+    val scaleAnim = remember { Animatable(initialScale) }
+    val targetScale = if (charging) 1f else 0f
 
-    val animatedFillWidth by animateFloatAsState(targetValue = batteryPercentage / 100f)
-    val animatedScale by animateFloatAsState(targetValue = if (charging) 1.2f else 1f)
+    LaunchedEffect(previousCharging, charging) {
+        scaleAnim.animateTo(targetScale, animationSpec = tween(durationMillis = 250))
+    }
 
     Column(
+        modifier = Modifier
+            .padding(12.dp)
+            .background(backgroundColor), // just for haze to work
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
-            modifier = Modifier.padding(bottom = 4.dp)
+        Box(
+            modifier = Modifier.padding(bottom = 4.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .width(batteryWidth)
-                    .height(batteryHeight)
-            ) {
-                Box (
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(1.dp, batteryOutlineColor, RoundedCornerShape(batteryCornerRadius))
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(2.dp)
-                        .width(batteryWidth * animatedFillWidth)
-                        .background(batteryFillColor, RoundedCornerShape(2.dp))
-                )
-                if (charging) {
-                    Text(
-                        text = "\uDBC0\uDEE6",
-                        fontSize = 16.sp,
-                        fontFamily = FontFamily(Font(R.font.sf_pro)),
-                        color = Color.White,
-                        modifier = Modifier
-                            .scale(animatedScale)
-                            .fillMaxSize(),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .width(tipWidth)
-                    .height(tipHeight)
-                    .padding(start = 1.dp)
-                    .background(
-                        batteryOutlineColor,
-                        RoundedCornerShape(
-                            topStart = 0.dp,
-                            topEnd = 12.dp,
-                            bottomStart = 0.dp,
-                            bottomEnd = 12.dp
-                        )
-                    )
+            CircularProgressIndicator(
+                progress = { batteryPercentage / 100f },
+                modifier = Modifier.size(40.dp),
+                color = batteryFillColor,
+                gapSize = 0.dp,
+                strokeCap = StrokeCap.Round,
+                strokeWidth = 2.dp,
+                trackColor = if (isDarkTheme) Color(0xFF0E0E0F) else Color(0xFFE3E3E8)
+            )
+
+            Text(
+                text = "\uDBC0\uDEE6",
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily(Font(R.font.sf_pro)),
+                    color = batteryFillColor,
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier.scale(scaleAnim.value)
             )
         }
 
         Text(
-            text = "$batteryPercentage%",
+            text = "$prefix $batteryPercentage%",
             color = batteryTextColor,
-            style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            style = TextStyle(
+                fontSize = 16.sp,
+                fontFamily = FontFamily(Font(R.font.sf_pro)),
+                textAlign = TextAlign.Center
+            ),
         )
     }
 }
 
-@Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun BatteryIndicatorPreview() {
-    BatteryIndicator(batteryPercentage = 48, charging = true)
+    val bg = if (isSystemInDarkTheme()) Color.Black else Color(0xFFF2F2F7)
+    Box(
+        modifier = Modifier.background(bg)
+    ) {
+        BatteryIndicator(batteryPercentage = 24, charging = true, prefix = "\uDBC6\uDCE5", previousCharging = false)
+    }
 }

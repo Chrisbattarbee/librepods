@@ -75,12 +75,12 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.refractionWithDispersion
 import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.rememberBackdrop
-import com.kyant.backdrop.rememberCombinedBackdropDrawer
 import com.kyant.backdrop.shadow.Shadow
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
@@ -88,18 +88,19 @@ import kotlin.math.roundToInt
 
 @Composable
 fun StyledSlider(
-    label: String? = null,  // New optional parameter for the label
+    label: String? = null,
     mutableFloatState: MutableFloatState,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    backdrop: Backdrop = rememberBackdrop(),
+    backdrop: Backdrop = rememberLayerBackdrop(),
     snapPoints: List<Float> = emptyList(),
     snapThreshold: Float = 0.05f,
     startIcon: String? = null,
     endIcon: String? = null,
     startLabel: String? = null,
     endLabel: String? = null,
-    independent: Boolean = false
+    independent: Boolean = false,
+    description: String? = null
 ) {
     val backgroundColor = if (isSystemInDarkTheme()) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
     val isLightTheme = !isSystemInDarkTheme()
@@ -126,7 +127,7 @@ fun StyledSlider(
             compositingStrategy = CompositingStrategy.Offscreen
         }
 
-    val sliderBackdrop = rememberBackdrop()
+    val sliderBackdrop = rememberLayerBackdrop()
     val trackWidthState = remember { mutableFloatStateOf(0f) }
     val trackPositionState = remember { mutableFloatStateOf(0f) }
     val startIconWidthState = remember { mutableFloatStateOf(0f) }
@@ -137,8 +138,9 @@ fun StyledSlider(
         Box(
             Modifier.fillMaxWidth(if (startIcon == null && endIcon == null) 0.95f else 1f)
             ) {
-            Box(Modifier
-                .backdrop(sliderBackdrop)
+            Box(
+                Modifier
+                    .layerBackdrop(sliderBackdrop)
                 .fillMaxWidth()) {
                 Column(
                     modifier = Modifier
@@ -188,7 +190,7 @@ fun StyledSlider(
                                 style = TextStyle(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Normal,
-                                    color = labelTextColor,
+                                    color = accentColor,
                                     fontFamily = FontFamily(Font(R.font.sf_pro))
                                 ),
                                 modifier = Modifier
@@ -237,7 +239,7 @@ fun StyledSlider(
                                 style = TextStyle(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Normal,
-                                    color = labelTextColor,
+                                    color = accentColor,
                                     fontFamily = FontFamily(Font(R.font.sf_pro))
                                 ),
                                 modifier = Modifier
@@ -291,7 +293,7 @@ fun StyledSlider(
                         }
                     )
                     .drawBackdrop(
-                        rememberCombinedBackdropDrawer(backdrop, sliderBackdrop),
+                        rememberCombinedBackdrop(backdrop, sliderBackdrop),
                         { RoundedCornerShape(28.dp) },
                         highlight = {
                             val progress = progressAnimation.value
@@ -299,8 +301,8 @@ fun StyledSlider(
                         },
                         shadow = {
                             Shadow(
-                                elevation = 4f.dp,
-                                color = Color.Black.copy(0.08f)
+                                radius = 4f.dp,
+                                color = Color.Black.copy(0.05f)
                             )
                         },
                         layer = {
@@ -337,10 +339,11 @@ fun StyledSlider(
                             drawLayer(innerShadowLayer)
 
                             drawRect(Color.White.copy(1f - progress))
+                        },
+                        effects = {
+                            refractionWithDispersion(6f.dp.toPx(), size.height / 2f)
                         }
-                    ) {
-                        refractionWithDispersion(6f.dp.toPx(), size.height / 2f)
-                    }
+                    )
                     .size(40f.dp, 24f.dp)
             )
         }
@@ -365,7 +368,7 @@ fun StyledSlider(
                     modifier = Modifier.padding(8.dp)
                 )
             }
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -376,9 +379,24 @@ fun StyledSlider(
             ) {
                 content()
             }
+
+            if (description != null) {
+                Text(
+                    text = description,
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Light,
+                        color = (if (isSystemInDarkTheme()) Color.White else Color.Black).copy(alpha = 0.6f),
+                        fontFamily = FontFamily(Font(R.font.sf_pro))
+                    ),
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
         }
     } else {
         if (label != null) Log.w("StyledSlider", "Label is ignored when independent is false")
+        if (description != null) Log.w("StyledSlider", "Description is ignored when independent is false")
         content()
     }
 }

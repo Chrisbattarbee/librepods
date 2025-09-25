@@ -20,6 +20,7 @@
 
 package me.kavishdevar.librepods.composables
 
+import android.content.Context.MODE_PRIVATE
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -35,8 +36,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,7 +46,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import android.content.Context.MODE_PRIVATE
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,9 +59,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 fun AutomaticConnectionSwitch() {
     val sharedPreferences = LocalContext.current.getSharedPreferences("settings", MODE_PRIVATE)
     val service = ServiceManager.getService()!!
-    
-    val shared_preference_key = "automatic_connection_ctrl_cmd"
-    
+
+    val sharedPreferenceKey = "automatic_connection_ctrl_cmd"
+
     val automaticConnectionEnabledValue = service.aacpManager.controlCommandStatusList.find {
         it.identifier == AACPManager.Companion.ControlCommandIdentifiers.AUTOMATIC_CONNECTION_CONFIG
     }?.value?.takeIf { it.isNotEmpty() }?.get(0)
@@ -71,7 +71,7 @@ fun AutomaticConnectionSwitch() {
             if (automaticConnectionEnabledValue != null) {
                 automaticConnectionEnabledValue == 1.toByte()
             } else {
-                sharedPreferences.getBoolean(shared_preference_key, false)
+                sharedPreferences.getBoolean(sharedPreferenceKey, false)
             }
         )
     }
@@ -83,9 +83,9 @@ fun AutomaticConnectionSwitch() {
             enabled
         )
         // todo: send other connected devices smartAudioRoutingDisabled or something, check packets again.
-        
+
         sharedPreferences.edit()
-            .putBoolean(shared_preference_key, enabled)
+            .putBoolean(sharedPreferenceKey, enabled)
             .apply()
     }
 
@@ -95,14 +95,14 @@ fun AutomaticConnectionSwitch() {
                 val newValue = controlCommand.value.takeIf { it.isNotEmpty() }?.get(0)
                 val enabled = newValue == 1.toByte()
                 automaticConnectionEnabled = enabled
-                
+
                 sharedPreferences.edit()
-                    .putBoolean(shared_preference_key, enabled)
+                    .putBoolean(sharedPreferenceKey, enabled)
                     .apply()
             }
         }
     }
-    
+
     LaunchedEffect(Unit) {
         service.aacpManager.registerControlCommandListener(
             AACPManager.Companion.ControlCommandIdentifiers.AUTOMATIC_CONNECTION_CONFIG,

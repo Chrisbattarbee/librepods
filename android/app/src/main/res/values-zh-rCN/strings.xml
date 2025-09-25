@@ -23,8 +23,6 @@
     <string name="conversational_awareness_description">当你开始与他人交谈时，会降低媒体音量并减少背景噪音。</string>
     <string name="personalized_volume">个性化音量</string>
     <string name="personalized_volume_description">根据环境自动调整媒体音量。</string>
-    <string name="less_noise">减少噪音</string>
-    <string name="more_noise">增加噪音</string>
     <string name="noise_cancellation_single_airpod">单只 AirPod 主动降噪</string>
     <string name="noise_cancellation_single_airpod_description">仅佩戴一只 AirPod 时也能开启主动降噪。</string>
     <string name="volume_control">音量控制</string>

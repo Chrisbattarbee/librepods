@@ -186,9 +186,7 @@ class ATTManager(private val device: BluetoothDevice) {
     private fun readResponse(timeoutMs: Long = 2000): ByteArray {
         try {
             val resp = responses.poll(timeoutMs, TimeUnit.MILLISECONDS)
-            if (resp == null) {
-                throw IllegalStateException("No response read from ATT socket within $timeoutMs ms")
-            }
+                ?: throw IllegalStateException("No response read from ATT socket within $timeoutMs ms")
             Log.d(TAG, "readResponse: ${resp.joinToString(" ") { String.format("%02X", it) }}")
             return resp.copyOfRange(1, resp.size)
         } catch (e: InterruptedException) {

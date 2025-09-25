@@ -41,34 +41,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -83,24 +68,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import dev.chrisbanes.haze.HazeEffectScope
-import dev.chrisbanes.haze.hazeEffect
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.highlight.Highlight
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
 import me.kavishdevar.librepods.composables.AudioSettings
 import me.kavishdevar.librepods.composables.BatteryView
 import me.kavishdevar.librepods.composables.CallControlSettings
 import me.kavishdevar.librepods.composables.ConnectionSettings
-import me.kavishdevar.librepods.composables.IndependentToggle
 import me.kavishdevar.librepods.composables.MicrophoneSettings
 import me.kavishdevar.librepods.composables.NameField
 import me.kavishdevar.librepods.composables.NavigationButton
 import me.kavishdevar.librepods.composables.NoiseControlSettings
 import me.kavishdevar.librepods.composables.PressAndHoldSettings
+import me.kavishdevar.librepods.composables.StyledButton
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
+import me.kavishdevar.librepods.composables.StyledToggle
 import me.kavishdevar.librepods.constants.AirPodsNotifications
 import me.kavishdevar.librepods.services.AirPodsService
 import me.kavishdevar.librepods.ui.theme.LibrePodsTheme
@@ -144,19 +131,11 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
         }
     }
 
-    val verticalScrollState  = rememberScrollState()
-    val hazeState = rememberHazeState( blurEnabled = true )
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     fun handleRemoteConnection(connected: Boolean) {
         isRemotelyConnected = connected
-    }
-
-    fun showSnackbar(message: String) {
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar(message)
-        }
     }
 
     val context = LocalContext.current
@@ -219,118 +198,38 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
             }
         }
     }
-
-    @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    Scaffold(
-        containerColor = if (isSystemInDarkTheme()) Color(
-            0xFF000000
-        ) else Color(
-            0xFFF2F2F7
-        ),
-        topBar = {
-            val darkMode = isSystemInDarkTheme()
-            val mDensity = remember { mutableFloatStateOf(1f) }
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = deviceName.text,
-                        style = TextStyle(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (darkMode) Color.White else Color.Black,
-                            fontFamily = FontFamily(Font(R.font.sf_pro))
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .hazeEffect(
-                        state = hazeState,
-                        style = CupertinoMaterials.thick(),
-                        block = fun HazeEffectScope.() {
-                            alpha =
-                                if (verticalScrollState.value > 60.dp.value * mDensity.floatValue) 1f else 0f
-                        }
-                    )
-                    .drawBehind {
-                        mDensity.floatValue = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (verticalScrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (darkMode) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                actions = {
-                    if (isRemotelyConnected) {
-                        IconButton(
-                            onClick = {
-                                showSnackbar("Connected remotely to AirPods via Linux.")
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = if (isSystemInDarkTheme()) Color.White else Color.Black
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Info",
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = {
-                            navController.navigate("app_settings")
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = if (isSystemInDarkTheme()) Color.White else Color.Black
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                        )
-                    }
-                }
+    val darkMode = isSystemInDarkTheme()
+    StyledScaffold(
+        title = deviceName.text,
+        actionButtons = listOf {
+            StyledIconButton(
+                onClick = { navController.navigate("app_settings") },
+                icon = "􀍟",
+                darkMode = darkMode
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+        snackbarHostState = snackbarHostState
+    ) { spacerHeight, hazeState ->
         if (isLocallyConnected || isRemotelyConnected) {
             Column(
                 modifier = Modifier
-                    .hazeSource(hazeState)
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(
-                        state = verticalScrollState,
-                        enabled = true,
-                    )
+                    .hazeSource(hazeState)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Spacer(Modifier.height(75.dp))
+                Spacer(modifier = Modifier.height(spacerHeight))
                 LaunchedEffect(service) {
                     service.let {
-                        it.sendBroadcast(Intent(AirPodsNotifications.Companion.BATTERY_DATA).apply {
+                        it.sendBroadcast(Intent(AirPodsNotifications.BATTERY_DATA).apply {
                             putParcelableArrayListExtra("data", ArrayList(it.getBattery()))
                         })
-                        it.sendBroadcast(Intent(AirPodsNotifications.Companion.ANC_DATA).apply {
+                        it.sendBroadcast(Intent(AirPodsNotifications.ANC_DATA).apply {
                             putExtra("data", it.getANC())
                         })
                     }
                 }
-                val sharedPreferences = LocalContext.current.getSharedPreferences("settings", MODE_PRIVATE)
-
-                Spacer(modifier = Modifier.height(64.dp))
 
                 BatteryView(service = service)
-
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Show BLE-only mode indicator
@@ -372,7 +271,7 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
                     PressAndHoldSettings(navController = navController)
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    AudioSettings()
+                    AudioSettings(navController = navController)
 
                     Spacer(modifier = Modifier.height(16.dp))
                     ConnectionSettings()
@@ -381,11 +280,8 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
                     MicrophoneSettings(hazeState)
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    IndependentToggle(
-                        name = stringResource(R.string.sleep_detection),
-                        service = service,
-                        sharedPreferences = sharedPreferences,
-                        default = false,
+                    StyledToggle(
+                        label = stringResource(R.string.sleep_detection),
                         controlCommandIdentifier = AACPManager.Companion.ControlCommandIdentifiers.SLEEP_DETECTION_CONFIG
                     )
 
@@ -396,11 +292,8 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
                     NavigationButton(to = "accessibility", "Accessibility", navController = navController)
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    IndependentToggle(
-                        name = stringResource(R.string.off_listening_mode),
-                        service = service,
-                        sharedPreferences = sharedPreferences,
-                        default = false,
+                    StyledToggle(
+                        label = stringResource(R.string.off_listening_mode).uppercase(),
                         controlCommandIdentifier = AACPManager.Companion.ControlCommandIdentifiers.ALLOW_OFF_OPTION,
                         description = stringResource(R.string.off_listening_mode_description)
                     )
@@ -415,19 +308,24 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
             }
         }
         else {
+            val backdrop = rememberLayerBackdrop()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp)
-                    .verticalScroll(
-                        state = verticalScrollState,
-                        enabled = true,
-                    ),
+                    .drawBackdrop(
+                        backdrop = rememberLayerBackdrop(),
+                        exportedBackdrop = backdrop,
+                        shape = { RoundedCornerShape(0.dp) },
+                        highlight = {
+                            Highlight.AmbientDefault.copy(alpha = 0f)
+                        }
+                    )
+                    .padding(horizontal = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "AirPods not connected",
+                    text = stringResource(R.string.airpods_not_connected),
                     style = TextStyle(
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Medium,
@@ -439,7 +337,7 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
                 )
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    text = "Please connect your AirPods to access settings.",
+                    text = stringResource(R.string.airpods_not_connected_description),
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Light,
@@ -450,13 +348,9 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(32.dp))
-                Button(
+                StyledButton(
                     onClick = { navController.navigate("troubleshooting") },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSystemInDarkTheme()) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
-                        contentColor = if (isSystemInDarkTheme()) Color.White else Color.Black,
-                    )
+                    backdrop = backdrop
                 ) {
                     Text(
                         text = "Troubleshoot Connection",
@@ -471,7 +365,6 @@ fun AirPodsSettingsScreen(dev: BluetoothDevice?, service: AirPodsService,
         }
     }
 }
-
 
 @Preview
 @Composable

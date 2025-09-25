@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import me.kavishdevar.librepods.R
 import me.kavishdevar.librepods.services.ServiceManager
-import me.kavishdevar.librepods.utils.ATTManager
 import me.kavishdevar.librepods.utils.ATTHandles
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -62,7 +61,7 @@ fun LoudSoundReductionSwitch() {
             false
         )
     }
-    val attManager = ServiceManager.getService()?.attManager ?: throw IllegalStateException("ATTManager not available")
+    val attManager = ServiceManager.getService()?.attManager ?: return
     LaunchedEffect(Unit) {
         attManager.enableNotifications(ATTHandles.LOUD_SOUND_REDUCTION)
 

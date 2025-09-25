@@ -1,5 +1,5 @@
 /*
- * LibrePods - AirPods liberated from Apple's ecosystem
+ * LibrePods - AirPods liberated from Apple’s ecosystem
  *
  * Copyright (C) 2025 LibrePods contributors
  *
@@ -202,10 +202,10 @@ class AACPManager {
 
     var eqData = FloatArray(8) { 0.0f }
         private set
-    
+
     var eqOnPhone: Boolean = false
         private set
-    
+
     var eqOnMedia: Boolean = false
         private set
 
@@ -528,12 +528,23 @@ class AACPManager {
                 val packetString = packet.decodeToString()
                 val sender = packet.sliceArray(6..11).reversedArray().joinToString(":") { "%02X".format(it) }
 
-                if (connectedDevices.find { it.mac == sender }?.type == null && packetString.contains("btName")) {
-                    val nameStartIndex = packetString.indexOf("btName") + 7
-                    val nameEndIndex = if (packetString.contains("other")) (packetString.indexOf("otherDevice") - 2) else (packetString.indexOf("nearbyAudio") - 2)
-                    val name = packet.sliceArray(nameStartIndex..nameEndIndex).decodeToString()
-                    connectedDevices.find { it.mac == sender }?.type = name
-                    Log.d(TAG, "Device $sender is named $name")
+                // if (connectedDevices.find { it.mac == sender }?.type == null && packetString.contains("btName")) {
+                //     val nameStartIndex = packetString.indexOf("btName") + 8
+                //     val nameEndIndex = if (packetString.contains("other")) (packetString.indexOf("otherDevice") - 1) else (packetString.indexOf("nearbyAudio") - 1)
+                //     val name = packet.sliceArray(nameStartIndex..nameEndIndex).decodeToString()
+                //     connectedDevices.find { it.mac == sender }?.type = name
+                //     Log.d(TAG, "Device $sender is named $name")
+                // } // doesn't work, it's different for Mac and iPad. just hardcoding for now
+                if ("iPad" in packetString) {
+                    connectedDevices.find { it.mac == sender }?.type = "iPad"
+                } else if ("Mac" in packetString) {
+                    connectedDevices.find { it.mac == sender }?.type = "Mac"
+                } else if ("iPhone" in packetString) { // not sure if this is it - don't have an iphone
+                    connectedDevices.find { it.mac == sender }?.type = "iPhone"
+                } else if ("Linux" in packetString) {
+                    connectedDevices.find { it.mac == sender }?.type = "Linux"
+                } else if ("Android" in packetString) {
+                    connectedDevices.find { it.mac == sender }?.type = "Android"
                 }
                 Log.d(TAG, "Smart Routing Response from $sender: $packetString, type: ${connectedDevices.find { it.mac == sender }?.type}")
                 if (packetString.contains("SetOwnershipToFalse")) {
@@ -568,7 +579,7 @@ class AACPManager {
                 val eq2 = ByteBuffer.wrap(packet, 44, 32).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
                 val eq3 = ByteBuffer.wrap(packet, 76, 32).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
                 val eq4 = ByteBuffer.wrap(packet, 108, 32).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
-                
+
                 // for now, taking just the first EQ
                 eqData = FloatArray(8) { i -> eq1.get(i) }
                 Log.d(TAG, "EQ Data set to: ${eqData.toList()}, eqOnPhone: $eqOnPhone, eqOnMedia: $eqOnMedia")
@@ -578,17 +589,6 @@ class AACPManager {
                 callback?.onUnknownPacketReceived(packet)
             }
         }
-    }
-
-    fun createEqualizerDataPacket(eqData: FloatArray, eqOnPhone: Boolean, eqOnMedia: Boolean): ByteArray {
-        val opcode = byteArrayOf(Opcodes.EQ_DATA, 0x00)
-        val identifier = byteArrayOf(0x84.toByte(), 0x00)
-        val something = byteArrayOf(0x02, 0x02)
-        val phoneFlag = if (eqOnPhone) 0x01.toByte() else 0x00.toByte()
-        val mediaFlag = if (eqOnMedia) 0x01.toByte() else 0x00.toByte()
-        val buffer = ByteBuffer.allocate(32).order(ByteOrder.LITTLE_ENDIAN)
-        eqData.forEach { buffer.putFloat(it) }
-        return opcode + identifier + something + byteArrayOf(phoneFlag, mediaFlag) + buffer.array() + buffer.array() + buffer.array() + buffer.array()
     }
 
     fun sendNotificationRequest(): Boolean {
@@ -853,11 +853,11 @@ class AACPManager {
             Log.w(TAG, "Cannot send Media Information packet: No connected device found")
             return false
         }
-        Log.d(TAG, "Sending Media Information packet to ${targetMac ?: "unknown device"}")
+        Log.d(TAG, "Sending Media Information packet to $targetMac")
         return sendDataPacket(
             createMediaInformationPacket(
                 selfMacAddress,
-                targetMac ?: return false,
+                targetMac,
                 streamingState
             )
         )

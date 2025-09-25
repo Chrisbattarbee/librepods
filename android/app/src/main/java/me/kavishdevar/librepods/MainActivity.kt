@@ -109,16 +109,17 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import me.kavishdevar.librepods.constants.AirPodsNotifications
 import me.kavishdevar.librepods.screens.AccessibilitySettingsScreen
+import me.kavishdevar.librepods.screens.AdaptiveStrengthScreen
 import me.kavishdevar.librepods.screens.AirPodsSettingsScreen
 import me.kavishdevar.librepods.screens.AppSettingsScreen
 import me.kavishdevar.librepods.screens.DebugScreen
 import me.kavishdevar.librepods.screens.HeadTrackingScreen
-import me.kavishdevar.librepods.screens.HearingAidScreen
 import me.kavishdevar.librepods.screens.HearingAidAdjustmentsScreen
-import me.kavishdevar.librepods.screens.TransparencySettingsScreen
+import me.kavishdevar.librepods.screens.HearingAidScreen
 import me.kavishdevar.librepods.screens.LongPress
 import me.kavishdevar.librepods.screens.Onboarding
 import me.kavishdevar.librepods.screens.RenameScreen
+import me.kavishdevar.librepods.screens.TransparencySettingsScreen
 import me.kavishdevar.librepods.screens.TroubleshootingScreen
 import me.kavishdevar.librepods.services.AirPodsService
 import me.kavishdevar.librepods.ui.theme.LibrePodsTheme
@@ -201,15 +202,12 @@ class MainActivity : ComponentActivity() {
         if (data != null && data.scheme == "librepods") {
             when (data.host) {
                 "add-magic-keys" -> {
-                    // Extract query parameters
                     val queryParams = data.queryParameterNames
                     queryParams.forEach { param ->
                         val value = data.getQueryParameter(param)
-                        // Handle your parameters here
                         Log.d("LibrePods", "Parameter: $param = $value")
                     }
 
-                    // Process the magic keys addition
                     handleAddMagicKeys(data)
                 }
             }
@@ -369,7 +367,7 @@ fun Main() {
                         name = navBackStackEntry.arguments?.getString("bud")!!
                     )
                 }
-                composable("rename") { navBackStackEntry ->
+                composable("rename") {
                     RenameScreen(navController)
                 }
                 composable("app_settings") {
@@ -395,6 +393,9 @@ fun Main() {
                 }
                 composable("hearing_aid_adjustments") {
                     HearingAidAdjustmentsScreen(navController)
+                }
+                composable("adaptive_strength") {
+                    AdaptiveStrengthScreen(navController)
                 }
             }
         }

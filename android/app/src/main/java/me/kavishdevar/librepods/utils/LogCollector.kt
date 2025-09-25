@@ -1,5 +1,5 @@
 /*
- * LibrePods - AirPods liberated from Apple's ecosystem
+ * LibrePods - AirPods liberated from Apple’s ecosystem
  *
  * Copyright (C) 2025 LibrePods contributors
  *

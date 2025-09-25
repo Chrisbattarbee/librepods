@@ -20,10 +20,7 @@ package me.kavishdevar.librepods.screens
 
 import android.annotation.SuppressLint
 import android.util.Log
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,61 +36,38 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.chrisbanes.haze.HazeEffectScope
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.composables.StyledSlider
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.ATTHandles
-import me.kavishdevar.librepods.utils.ATTManager
 import me.kavishdevar.librepods.utils.RadareOffsetFinder
 import me.kavishdevar.librepods.utils.TransparencySettings
 import me.kavishdevar.librepods.utils.parseTransparencySettingsResponse
@@ -111,8 +85,6 @@ fun TransparencySettingsScreen(navController: NavController) {
     val isDarkTheme = isSystemInDarkTheme()
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val verticalScrollState = rememberScrollState()
-    val hazeState = remember { HazeState() }
-    val snackbarHostState = remember { SnackbarHostState() }
     val attManager = ServiceManager.getService()?.attManager ?: return
     val aacpManager = remember { ServiceManager.getService()?.aacpManager }
     val isSdpOffsetAvailable =
@@ -122,65 +94,24 @@ fun TransparencySettingsScreen(navController: NavController) {
     val activeTrackColor = if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5)
     val thumbColor = if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFFFFFFFF)
 
-    Scaffold(
-        containerColor = if (isSystemInDarkTheme()) Color(
-            0xFF000000
-        ) else Color(
-            0xFFF2F2F7
-        ),
-        topBar = {
-            val darkMode = isSystemInDarkTheme()
-            val mDensity = remember { mutableFloatStateOf(1f) }
-
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.customize_transparency_mode),
-                        style = TextStyle(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (darkMode) Color.White else Color.Black,
-                            fontFamily = FontFamily(Font(R.font.sf_pro))
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .hazeEffect(
-                        state = hazeState,
-                        style = CupertinoMaterials.thick(),
-                        block = fun HazeEffectScope.() {
-                            alpha =
-                                if (verticalScrollState.value > 60.dp.value * mDensity.floatValue) 1f else 0f
-                        })
-                    .drawBehind {
-                        mDensity.floatValue = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (verticalScrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (darkMode) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                )
+    StyledScaffold(
+        title = stringResource(R.string.customize_transparency_mode),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+        }
+    ){ spacerHeight, hazeState ->
         Column(
             modifier = Modifier
                 .hazeSource(hazeState)
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
                 .verticalScroll(verticalScrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
             val backgroundColor = if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
 
             val enabled = remember { mutableStateOf(false) }

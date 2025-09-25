@@ -42,38 +42,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -82,39 +75,32 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
 import androidx.navigation.NavController
-import dev.chrisbanes.haze.HazeEffectScope
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.composables.StyledSwitch
 import me.kavishdevar.librepods.utils.AACPManager
 import me.kavishdevar.librepods.utils.RadareOffsetFinder
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.roundToInt
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class, ExperimentalEncodingApi::class)
 @Composable
 fun AppSettingsScreen(navController: NavController) {
     val sharedPreferences = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    val name = remember { mutableStateOf(sharedPreferences.getString("name", "") ?: "") }
+
     val isDarkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val hazeState = remember { HazeState() }
 
     var showResetDialog by remember { mutableStateOf(false) }
     var showIrkDialog by remember { mutableStateOf(false) }
@@ -134,6 +120,7 @@ fun AppSettingsScreen(navController: NavController) {
                 irkValue = decoded.joinToString("") { "%02x".format(it) }
             } catch (e: Exception) {
                 irkValue = ""
+                e.printStackTrace()
             }
         }
 
@@ -143,6 +130,7 @@ fun AppSettingsScreen(navController: NavController) {
                 encKeyValue = decoded.joinToString("") { "%02x".format(it) }
             } catch (e: Exception) {
                 encKeyValue = ""
+                e.printStackTrace()
             }
         }
     }
@@ -198,8 +186,6 @@ fun AppSettingsScreen(navController: NavController) {
         }
     }
 
-    var mDensity by remember { mutableFloatStateOf(0f) }
-
     fun validateHexInput(input: String): Boolean {
         val hexPattern = Regex("^[0-9a-fA-F]{32}$")
         return hexPattern.matches(input)
@@ -210,84 +196,24 @@ fun AppSettingsScreen(navController: NavController) {
 
     BackHandler(enabled = isProcessingSdp) {}
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                modifier = Modifier.hazeEffect(
-                    state = hazeState,
-                    style = CupertinoMaterials.thick(),
-                    block = fun HazeEffectScope.() {
-                        alpha =
-                            if (scrollState.value > 60.dp.value * mDensity) 1f else 0f
-                    })
-                    .drawBehind {
-                        mDensity = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (scrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (isDarkTheme) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                title = {
-                    Text(
-                        text = stringResource(R.string.app_settings),
-                        fontFamily = FontFamily(Font(R.font.sf_pro)),
-                    )
-                },
-                navigationIcon = {
-                    TextButton(
-                        onClick = {
-                            if (!isProcessingSdp) {
-                                navController.popBackStack()
-                            }
-                        },
-                        enabled = !isProcessingSdp,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.width(180.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Back",
-                            tint = if (isDarkTheme)  Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                            modifier = Modifier.scale(1.5f)
-                        )
-                        Text(
-                            text = name.value,
-                            style = TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                                fontFamily = FontFamily(Font(R.font.sf_pro))
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                scrollBehavior = scrollBehavior
+    StyledScaffold(
+        title = stringResource(R.string.app_settings),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
-        },
-        containerColor = if (isSystemInDarkTheme()) Color(0xFF000000)
-        else Color(0xFFF2F2F7),
-    ) { paddingValues ->
-        Column (
+        }
+    ) { spacerHeight, hazeState ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
                 .verticalScroll(scrollState)
                 .hazeSource(state = hazeState)
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
+
             val isDarkTheme = isSystemInDarkTheme()
             val backgroundColor = if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
             val textColor = if (isDarkTheme) Color.White else Color.Black
@@ -295,7 +221,7 @@ fun AppSettingsScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Widget".uppercase(),
+                text = stringResource(R.string.widget).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -335,13 +261,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Show phone battery in widget",
+                            text = stringResource(R.string.show_phone_battery_in_widget),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Display your phone's battery level in the widget alongside AirPods battery",
+                            text = stringResource(R.string.show_phone_battery_in_widget_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -359,7 +285,7 @@ fun AppSettingsScreen(navController: NavController) {
             }
 
             Text(
-                text = "Connection Mode".uppercase(),
+                text = stringResource(R.string.connection_mode).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -399,12 +325,12 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "BLE Only Mode",
+                            text = stringResource(R.string.ble_only_mode),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Text(
-                            text = "Only use Bluetooth Low Energy for battery data and ear detection. Disables advanced features requiring L2CAP connection.",
+                            text = stringResource(R.string.ble_only_mode_description),
                             fontSize = 13.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -422,7 +348,7 @@ fun AppSettingsScreen(navController: NavController) {
             }
 
             Text(
-                text = "Conversational Awareness".uppercase(),
+                text = stringResource(R.string.conversational_awareness).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -539,7 +465,7 @@ fun AppSettingsScreen(navController: NavController) {
                 }
 
                 Text(
-                    text = "Conversational Awareness Volume",
+                    text = stringResource(R.string.conversational_awareness_volume),
                     fontSize = 16.sp,
                     color = textColor,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -628,7 +554,7 @@ fun AppSettingsScreen(navController: NavController) {
             }
 
             Text(
-                text = "Quick Settings Tile".uppercase(),
+                text = stringResource(R.string.quick_settings_tile).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -672,15 +598,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Open dialog for controlling",
+                            text = stringResource(R.string.open_dialog_for_controlling),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (openDialogForControlling)
-                                   "If disabled, clicking on the QS will cycle through modes"
-                                   else "If enabled, it will show a dialog for controlling noise control mode and conversational awareness",
+                            text = stringResource(R.string.open_dialog_for_controlling_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -697,7 +621,7 @@ fun AppSettingsScreen(navController: NavController) {
             }
 
             Text(
-                text = "Ear Detection".uppercase(),
+                text = stringResource(R.string.ear_detection).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -741,13 +665,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Disconnect AirPods when not wearing",
+                            text = stringResource(R.string.disconnect_when_not_wearing),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "You will still be able to control them with the app - this just disconnects the audio.",
+                            text = stringResource(R.string.disconnect_when_not_wearing_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -1051,7 +975,7 @@ fun AppSettingsScreen(navController: NavController) {
             }
 
             Text(
-                text = "Advanced Options".uppercase(),
+                text = stringResource(R.string.advanced_options).uppercase(),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -1087,13 +1011,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Set Identity Resolving Key (IRK)",
+                            text = stringResource(R.string.set_identity_resolving_key),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Manually set the IRK value used for resolving BLE random addresses",
+                            text = stringResource(R.string.set_identity_resolving_key_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -1116,13 +1040,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Set Encryption Key",
+                            text = stringResource(R.string.set_encryption_key),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Manually set the ENC_KEY value used for decrypting BLE advertisements",
+                            text = stringResource(R.string.set_encryption_key_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -1152,13 +1076,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Use alternate head tracking packets",
+                            text = stringResource(R.string.use_alternate_head_tracking_packets),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Enable this if head tracking doesn't work for you. This sends different data to AirPods for requesting/stopping head tracking data.",
+                            text = stringResource(R.string.use_alternate_head_tracking_packets_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -1206,6 +1130,7 @@ fun AppSettingsScreen(navController: NavController) {
                 LaunchedEffect(Unit) {
                     actAsAppleDevice = RadareOffsetFinder.isSdpOffsetAvailable()
                 }
+                val restartBluetoothText = stringResource(R.string.found_offset_restart_bluetooth)
 
                 Row(
                     modifier = Modifier
@@ -1222,9 +1147,9 @@ fun AppSettingsScreen(navController: NavController) {
                                 coroutineScope.launch {
                                     if (newValue) {
                                         val radareOffsetFinder = RadareOffsetFinder(context)
-                                        val success = radareOffsetFinder.findSdpOffset() ?: false
+                                        val success = radareOffsetFinder.findSdpOffset()
                                         if (success) {
-                                            Toast.makeText(context, "Found offset please restart the Bluetooth process", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, restartBluetoothText, Toast.LENGTH_LONG).show()
                                         }
                                     } else {
                                         RadareOffsetFinder.clearSdpOffset()
@@ -1242,13 +1167,13 @@ fun AppSettingsScreen(navController: NavController) {
                             .padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "Act as an Apple device",
+                            text = stringResource(R.string.act_as_an_apple_device),
                             fontSize = 16.sp,
                             color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Enables multi-device connectivity and Accessibility features like customizing transparency mode (amplification, tone, ambient noise reduction, conversation boost, and EQ)",
+                            text = stringResource(R.string.act_as_an_apple_device_description),
                             fontSize = 14.sp,
                             color = textColor.copy(0.6f),
                             lineHeight = 16.sp,
@@ -1256,14 +1181,13 @@ fun AppSettingsScreen(navController: NavController) {
                         if (actAsAppleDevice) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Might be unstable!! A maximum of two devices can be connected to your AirPods. If you are using with an Apple device like an iPad or Mac, then please connect that device first and then your Android.",
+                                text = stringResource(R.string.act_as_an_apple_device_warning),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.error,
                                 lineHeight = 14.sp,
                             )
                         }
                     }
-
                     StyledSwitch(
                         checked = actAsAppleDevice,
                         onCheckedChange = {
@@ -1273,9 +1197,9 @@ fun AppSettingsScreen(navController: NavController) {
                                 coroutineScope.launch {
                                     if (it) {
                                         val radareOffsetFinder = RadareOffsetFinder(context)
-                                        val success = radareOffsetFinder.findSdpOffset() ?: false
+                                        val success = radareOffsetFinder.findSdpOffset()
                                         if (success) {
-                                            Toast.makeText(context, "Found offset please restart the Bluetooth process", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, restartBluetoothText, Toast.LENGTH_LONG).show()
                                         }
                                     } else {
                                         RadareOffsetFinder.clearSdpOffset()
@@ -1313,7 +1237,7 @@ fun AppSettingsScreen(navController: NavController) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Reset Hook Offset",
+                        text = stringResource(R.string.reset_hook_offset),
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = TextStyle(
                             fontSize = 16.sp,
@@ -1338,17 +1262,19 @@ fun AppSettingsScreen(navController: NavController) {
                     },
                     text = {
                         Text(
-                            "This will clear the current hook offset and require you to go through the setup process again. Are you sure you want to continue?",
+                            stringResource(R.string.reset_hook_offset_description),
                             fontFamily = FontFamily(Font(R.font.sf_pro))
                         )
                     },
                     confirmButton = {
+                        val successText = stringResource(R.string.hook_offset_reset_success)
+                        val failureText = stringResource(R.string.hook_offset_reset_failure)
                         TextButton(
                             onClick = {
                                 if (RadareOffsetFinder.clearHookOffsets()) {
                                     Toast.makeText(
                                         context,
-                                        "Hook offset has been reset. Redirecting to setup...",
+                                        successText,
                                         Toast.LENGTH_LONG
                                     ).show()
 
@@ -1358,7 +1284,7 @@ fun AppSettingsScreen(navController: NavController) {
                                 } else {
                                     Toast.makeText(
                                         context,
-                                        "Failed to reset hook offset",
+                                        failureText,
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -1369,7 +1295,7 @@ fun AppSettingsScreen(navController: NavController) {
                             )
                         ) {
                             Text(
-                                "Reset",
+                                stringResource(R.string.reset),
                                 fontFamily = FontFamily(Font(R.font.sf_pro)),
                                 fontWeight = FontWeight.Medium
                             )
@@ -1394,7 +1320,7 @@ fun AppSettingsScreen(navController: NavController) {
                     onDismissRequest = { showIrkDialog = false },
                     title = {
                         Text(
-                            "Set Identity Resolving Key (IRK)",
+                            stringResource(R.string.set_identity_resolving_key),
                             fontFamily = FontFamily(Font(R.font.sf_pro)),
                             fontWeight = FontWeight.Medium
                         )
@@ -1402,7 +1328,7 @@ fun AppSettingsScreen(navController: NavController) {
                     text = {
                         Column {
                             Text(
-                                "Enter 16-byte IRK as hex string (32 characters):",
+                                stringResource(R.string.enter_irk_hex),
                                 fontFamily = FontFamily(Font(R.font.sf_pro)),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
@@ -1425,14 +1351,16 @@ fun AppSettingsScreen(navController: NavController) {
                                 ),
                                 supportingText = {
                                     if (irkError != null) {
-                                        Text(irkError!!, color = MaterialTheme.colorScheme.error)
+                                        Text(stringResource(R.string.must_be_32_hex_chars), color = MaterialTheme.colorScheme.error)
                                     }
                                 },
-                                label = { Text("IRK Hex Value") }
+                                label = { Text(stringResource(R.string.irk_hex_value)) }
                             )
                         }
                     },
                     confirmButton = {
+                        val successText = stringResource(R.string.irk_set_success)
+                        val errorText = stringResource(R.string.error_converting_hex)
                         TextButton(
                             onClick = {
                                 if (!validateHexInput(irkValue)) {
@@ -1450,10 +1378,10 @@ fun AppSettingsScreen(navController: NavController) {
                                     val base64Value = Base64.encode(hexBytes)
                                     sharedPreferences.edit { putString(AACPManager.Companion.ProximityKeyType.IRK.name, base64Value)}
 
-                                    Toast.makeText(context, "IRK has been set successfully", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, successText, Toast.LENGTH_SHORT).show()
                                     showIrkDialog = false
                                 } catch (e: Exception) {
-                                    irkError = "Error converting hex: ${e.message}"
+                                    irkError = errorText + " " + (e.message ?: "Unknown error")
                                 }
                             }
                         ) {
@@ -1483,7 +1411,7 @@ fun AppSettingsScreen(navController: NavController) {
                     onDismissRequest = { showEncKeyDialog = false },
                     title = {
                         Text(
-                            "Set Encryption Key",
+                            stringResource(R.string.set_encryption_key),
                             fontFamily = FontFamily(Font(R.font.sf_pro)),
                             fontWeight = FontWeight.Medium
                         )
@@ -1491,7 +1419,7 @@ fun AppSettingsScreen(navController: NavController) {
                     text = {
                         Column {
                             Text(
-                                "Enter 16-byte ENC_KEY as hex string (32 characters):",
+                                stringResource(R.string.enter_enc_key_hex),
                                 fontFamily = FontFamily(Font(R.font.sf_pro)),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
@@ -1514,14 +1442,16 @@ fun AppSettingsScreen(navController: NavController) {
                                 ),
                                 supportingText = {
                                     if (encKeyError != null) {
-                                        Text(encKeyError!!, color = MaterialTheme.colorScheme.error)
+                                        Text(stringResource(R.string.must_be_32_hex_chars), color = MaterialTheme.colorScheme.error)
                                     }
                                 },
-                                label = { Text("ENC_KEY Hex Value") }
+                                label = { Text(stringResource(R.string.enc_key_hex_value)) }
                             )
                         }
                     },
                     confirmButton = {
+                        val successText = stringResource(R.string.encryption_key_set_success)
+                        val errorText = stringResource(R.string.error_converting_hex)
                         TextButton(
                             onClick = {
                                 if (!validateHexInput(encKeyValue)) {
@@ -1539,10 +1469,10 @@ fun AppSettingsScreen(navController: NavController) {
                                     val base64Value = Base64.encode(hexBytes)
                                     sharedPreferences.edit { putString(AACPManager.Companion.ProximityKeyType.ENC_KEY.name, base64Value)}
 
-                                    Toast.makeText(context, "Encryption key has been set successfully", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, successText, Toast.LENGTH_SHORT).show()
                                     showEncKeyDialog = false
                                 } catch (e: Exception) {
-                                    encKeyError = "Error converting hex: ${e.message}"
+                                    encKeyError = errorText + " " + (e.message ?: "Unknown error")
                                 }
                             }
                         ) {

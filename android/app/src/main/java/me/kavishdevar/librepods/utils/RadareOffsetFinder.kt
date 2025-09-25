@@ -462,7 +462,8 @@ class RadareOffsetFinder(context: Context) {
 //            findAndSaveL2cuProcessCfgReqOffset(libraryPath, envSetup)
 //            findAndSaveL2cCsmConfigOffset(libraryPath, envSetup)
 //            findAndSaveL2cuSendPeerInfoReqOffset(libraryPath, envSetup)
-            findAndSaveSdpOffset(libraryPath, envSetup)
+            
+            // findAndSaveSdpOffset(libraryPath, envSetup) Should not be run by default, only when user asks for it.
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to find function offset", e)

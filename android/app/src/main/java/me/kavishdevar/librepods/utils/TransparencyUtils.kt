@@ -1,6 +1,23 @@
+/*
+ * LibrePods - AirPods liberated from Apple’s ecosystem
+ *
+ * Copyright (C) 2025 LibrePods contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package me.kavishdevar.librepods.utils
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -9,8 +26,6 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-
-private const val TAG = "TransparencyUtils"
 
 data class TransparencySettings(
     val enabled: Boolean,
@@ -67,9 +82,8 @@ data class TransparencySettings(
     }
 }
 
-fun parseTransparencySettingsResponse(data: ByteArray): TransparencySettings? {
-    val settingsData = data
-    val buffer = ByteBuffer.wrap(settingsData).order(ByteOrder.LITTLE_ENDIAN)
+fun parseTransparencySettingsResponse(data: ByteArray): TransparencySettings {
+    val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
 
     val enabled = buffer.float
 

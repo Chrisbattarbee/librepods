@@ -19,22 +19,16 @@
 package me.kavishdevar.librepods.screens
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,23 +37,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.chrisbanes.haze.HazeEffectScope
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,13 +49,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
-import me.kavishdevar.librepods.composables.IndependentToggle
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.composables.StyledSlider
+import me.kavishdevar.librepods.composables.StyledToggle
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.AACPManager
 import me.kavishdevar.librepods.utils.ATTHandles
 import me.kavishdevar.librepods.utils.ATTManager
-import me.kavishdevar.librepods.utils.RadareOffsetFinder
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -88,78 +71,31 @@ private const val TAG = "HearingAidAdjustments"
 @Composable
 fun HearingAidAdjustmentsScreen(@Suppress("unused") navController: NavController) {
     val isDarkTheme = isSystemInDarkTheme()
-    val textColor = if (isDarkTheme) Color.White else Color.Black
     val verticalScrollState = rememberScrollState()
     val hazeState = remember { HazeState() }
-    val snackbarHostState = remember { SnackbarHostState() }
     val attManager = ServiceManager.getService()?.attManager ?: throw IllegalStateException("ATTManager not available")
 
     val aacpManager = remember { ServiceManager.getService()?.aacpManager }
-    val context = LocalContext.current
-    remember { RadareOffsetFinder(context) }
-    remember { mutableStateOf(RadareOffsetFinder.isSdpOffsetAvailable()) }
-    val service = ServiceManager.getService()
 
-    if (isDarkTheme) Color(0xFFB3B3B3) else Color(0xFF929491)
-    if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5)
-    if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFFFFFFFF)
-    if (isDarkTheme) Color.White else Color.Black
-
-    Scaffold(
-        containerColor = if (isSystemInDarkTheme()) Color(0xFF000000) else Color(0xFFF2F2F7),
-        topBar = {
-            val darkMode = isSystemInDarkTheme()
-            val mDensity = remember { mutableFloatStateOf(1f) }
-
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.adjustments),
-                        style = TextStyle(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (darkMode) Color.White else Color.Black,
-                            fontFamily = FontFamily(Font(R.font.sf_pro))
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .hazeEffect(
-                        state = hazeState,
-                        style = CupertinoMaterials.thick(),
-                        block = fun HazeEffectScope.() {
-                            alpha = if (verticalScrollState.value > 60.dp.value * mDensity.floatValue) 1f else 0f
-                        })
-                    .drawBehind {
-                        mDensity.floatValue = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (verticalScrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (darkMode) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
+    StyledScaffold(
+        title = stringResource(R.string.adjustments),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+        }
+    ) { spacerHeight ->
         Column(
             modifier = Modifier
                 .hazeSource(hazeState)
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
                 .verticalScroll(verticalScrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
+            Spacer(modifier = Modifier.height(spacerHeight))
 
-            remember { mutableStateOf(false) }
             val amplificationSliderValue = remember { mutableFloatStateOf(0.5f) }
             val balanceSliderValue = remember { mutableFloatStateOf(0.5f) }
             val toneSliderValue = remember { mutableFloatStateOf(0.5f) }
@@ -355,12 +291,9 @@ fun HearingAidAdjustmentsScreen(@Suppress("unused") navController: NavController
                 independent = true,
             )
 
-            val sharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-            IndependentToggle(
-                name = stringResource(R.string.swipe_to_control_amplification),
-                service = service,
-                sharedPreferences = sharedPreferences,
+            StyledToggle(
+                label = stringResource(R.string.swipe_to_control_amplification),
                 controlCommandIdentifier = AACPManager.Companion.ControlCommandIdentifiers.HPS_GAIN_SWIPE,
                 description = stringResource(R.string.swipe_amplification_description)
             )

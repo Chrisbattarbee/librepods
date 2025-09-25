@@ -39,27 +39,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -70,20 +64,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.kyant.backdrop.backdrop
-import com.kyant.backdrop.rememberBackdrop
-import dev.chrisbanes.haze.HazeEffectScope
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
 import me.kavishdevar.librepods.composables.ConfirmationDialog
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.composables.StyledSwitch
+import me.kavishdevar.librepods.composables.StyledToggle
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.AACPManager
 import me.kavishdevar.librepods.utils.ATTHandles
@@ -108,7 +102,8 @@ fun HearingAidScreen(navController: NavController) {
     val aacpManager = remember { ServiceManager.getService()?.aacpManager }
 
     val showDialog = remember { mutableStateOf(false) }
-    val backdrop = rememberBackdrop()
+    val backdrop = rememberLayerBackdrop()
+    val initialLoad = remember { mutableStateOf(true) }
 
     val hearingAidEnabled = remember {
         val aidStatus = aacpManager?.controlCommandStatusList?.find { it.identifier == AACPManager.Companion.ControlCommandIdentifiers.HEARING_AID }
@@ -116,67 +111,28 @@ fun HearingAidScreen(navController: NavController) {
         mutableStateOf((aidStatus?.value?.getOrNull(1) == 0x01.toByte()) && (assistStatus?.value?.getOrNull(0) == 0x01.toByte()))
     }
 
-    Scaffold(
-        containerColor = if (isSystemInDarkTheme()) Color(
-            0xFF000000
-        ) else Color(
-            0xFFF2F2F7
-        ),
-        topBar = {
-            val darkMode = isSystemInDarkTheme()
-            val mDensity = remember { mutableFloatStateOf(1f) }
-
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.hearing_aid),
-                        style = TextStyle(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (darkMode) Color.White else Color.Black,
-                            fontFamily = FontFamily(Font(R.font.sf_pro))
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .hazeEffect(
-                        state = hazeState,
-                        style = CupertinoMaterials.thick(),
-                        block = fun HazeEffectScope.() {
-                            alpha =
-                                if (verticalScrollState.value > 60.dp.value * mDensity.floatValue) 1f else 0f
-                        })
-                    .drawBehind {
-                        mDensity.floatValue = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (verticalScrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (darkMode) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                )
+    StyledScaffold(
+        title = stringResource(R.string.hearing_aid),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = Modifier
-            .backdrop(backdrop)
-    ) { paddingValues ->
+        actionButtons = emptyList(),
+        snackbarHostState = snackbarHostState,
+    ) { spacerHeight ->
         Column(
             modifier = Modifier
+                .layerBackdrop(backdrop)
                 .hazeSource(hazeState)
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
                 .verticalScroll(verticalScrollState),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
+
             val hearingAidListener = remember {
                 object : AACPManager.ControlCommandListener {
                     override fun onControlCommandReceived(controlCommand: AACPManager.ControlCommand) {
@@ -206,14 +162,15 @@ fun HearingAidScreen(navController: NavController) {
                 }
             }
 
-            fun onChange(value: Boolean) {
-                if (value) {
+            LaunchedEffect(hearingAidEnabled.value) {
+                if (hearingAidEnabled.value && !initialLoad.value) {
                     showDialog.value = true
-                } else {
+                } else if (!hearingAidEnabled.value) {
                     aacpManager?.sendControlCommand(AACPManager.Companion.ControlCommandIdentifiers.HEARING_AID.value, byteArrayOf(0x01, 0x02))
                     aacpManager?.sendControlCommand(AACPManager.Companion.ControlCommandIdentifiers.HEARING_ASSIST_CONFIG.value, 0x02.toByte())
                     hearingAidEnabled.value = false
                 }
+                initialLoad.value = false
             }
 
             fun onAdjustPhoneChange(value: Boolean) {
@@ -241,37 +198,15 @@ fun HearingAidScreen(navController: NavController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(backgroundColor, RoundedCornerShape(14.dp))
-            ) {
-                val isDarkThemeLocal = isSystemInDarkTheme()
-                var backgroundColorHA by remember { mutableStateOf(if (isDarkThemeLocal) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)) }
-                val animatedBackgroundColorHA by animateColorAsState(targetValue = backgroundColorHA, animationSpec = tween(durationMillis = 500))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    backgroundColorHA = if (isDarkThemeLocal) Color(0x40888888) else Color(0x40D9D9D9)
-                                    tryAwaitRelease()
-                                    backgroundColorHA = if (isDarkThemeLocal) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
-                                },
-                                onTap = {
-                                    onChange(value = !hearingAidEnabled.value)
-                                }
-                            )
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = stringResource(R.string.hearing_aid), modifier = Modifier.weight(1f), fontSize = 16.sp, color = textColor)
-                    StyledSwitch(
-                        checked = hearingAidEnabled.value,
-                        onCheckedChange = {
-                            onChange(value = it)
-                        },
+                    .clip(
+                        RoundedCornerShape(14.dp)
                     )
-                }
-
+            ) {
+                StyledToggle(
+                    label = stringResource(R.string.hearing_aid),
+                    checkedState = hearingAidEnabled,
+                    independent = false
+                )
                 HorizontalDivider(
                     thickness = 1.5.dp,
                     color = Color(0x40888888),
@@ -299,7 +234,6 @@ fun HearingAidScreen(navController: NavController) {
                     )
                 }
             }
-
             Text(
                 text = stringResource(R.string.hearing_aid_description),
                 style = TextStyle(
@@ -310,7 +244,6 @@ fun HearingAidScreen(navController: NavController) {
                 ),
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
-
             Spacer(modifier = Modifier.height(16.dp))
 
             AccessibilityToggle(

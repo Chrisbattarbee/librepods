@@ -182,21 +182,31 @@ class AirPodsNotifications {
             if (data.size != 22) {
                 return
             }
-            first = if (data[10].toInt() == BatteryStatus.DISCONNECTED) {
-                Battery(first.component, first.level, data[10].toInt())
-            } else {
-                Battery(data[7].toInt(), data[9].toInt(), data[10].toInt())
-            }
-            second = if (data[15].toInt() == BatteryStatus.DISCONNECTED) {
-                Battery(second.component, second.level, data[15].toInt())
-            } else {
-                Battery(data[12].toInt(), data[14].toInt(), data[15].toInt())
-            }
-            case = if (data[20].toInt() == BatteryStatus.DISCONNECTED && case.status != BatteryStatus.DISCONNECTED) {
-                Battery(case.component, case.level, data[20].toInt())
-            } else {
-                Battery(data[17].toInt(), data[19].toInt(), data[20].toInt())
-            }
+//            first = if (data[10].toInt() == BatteryStatus.DISCONNECTED) {
+//                Battery(first.component, first.level, data[10].toInt())
+//            } else {
+//                Battery(data[7].toInt(), data[9].toInt(), data[10].toInt())
+//            }
+//            second = if (data[15].toInt() == BatteryStatus.DISCONNECTED) {
+//                Battery(second.component, second.level, data[15].toInt())
+//            } else {
+//                Battery(data[12].toInt(), data[14].toInt(), data[15].toInt())
+//            }
+//            case = if (data[20].toInt() == BatteryStatus.DISCONNECTED && case.status != BatteryStatus.DISCONNECTED) {
+//                Battery(case.component, case.level, data[20].toInt())
+//            } else {
+//                Battery(data[17].toInt(), data[19].toInt(), data[20].toInt())
+//            }
+//            sometimes it shows battery as -1%, just skip all that and set it normally
+            first = Battery(
+                data[7].toInt(), data[9].toInt(), data[10].toInt()
+            )
+            second = Battery(
+                data[12].toInt(), data[14].toInt(), data[15].toInt()
+            )
+            case = Battery(
+                data[17].toInt(), data[19].toInt(), data[20].toInt()
+            )
         }
 
         fun getBattery(): List<Battery> {

@@ -50,14 +50,14 @@ import androidx.navigation.NavController
 
 
 @Composable
-fun NavigationButton(to: String, name: String, navController: NavController, onClick: (() -> Unit)? = null) {
+fun NavigationButton(to: String, name: String, navController: NavController, onClick: (() -> Unit)? = null, independent: Boolean = true) {
     val isDarkTheme = isSystemInDarkTheme()
     var backgroundColor by remember { mutableStateOf(if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)) }
     val animatedBackgroundColor by animateColorAsState(targetValue = backgroundColor, animationSpec = tween(durationMillis = 500))
 
     Row(
         modifier = Modifier
-            .background(animatedBackgroundColor, RoundedCornerShape(14.dp))
+            .background(animatedBackgroundColor, RoundedCornerShape(if (independent) 14.dp else 0.dp))
             .height(55.dp)
             .pointerInput(Unit) {
                 detectTapGestures(

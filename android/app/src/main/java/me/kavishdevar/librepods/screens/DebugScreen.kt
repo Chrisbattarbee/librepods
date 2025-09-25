@@ -29,10 +29,8 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
@@ -50,37 +48,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -92,15 +78,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.chrisbanes.haze.HazeEffectScope
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.constants.BatteryStatus
 import me.kavishdevar.librepods.constants.isHeadTrackingData
 import me.kavishdevar.librepods.services.ServiceManager
@@ -304,52 +288,24 @@ fun parseOutgoingPacket(bytes: ByteArray, rawData: String): PacketInfo {
     }
 }
 
-@Composable
-fun IOSCheckbox(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .size(24.dp)
-            .clickable { onCheckedChange(!checked) },
-        contentAlignment = Alignment.Center
-    ) {
-        if (checked) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Checked",
-                tint = if (isSystemInDarkTheme()) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
 @RequiresApi(Build.VERSION_CODES.Q)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "UnspecifiedRegisterReceiverFlag")
 @Composable
 fun DebugScreen(navController: NavController) {
-    val hazeState = remember { HazeState() }
     val context = LocalContext.current
     val listState = rememberLazyListState()
-    val scrollOffset by remember { derivedStateOf { listState.firstVisibleItemScrollOffset } }
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
 
-    val showMenu = remember { mutableStateOf(false) }
-
     val airPodsService = remember { ServiceManager.getService() }
     val packetLogs = airPodsService?.packetLogsFlow?.collectAsState(emptySet())?.value ?: emptySet()
-    val shouldScrollToBottom = remember { mutableStateOf(true) }
 
     val refreshTrigger = remember { mutableIntStateOf(0) }
     LaunchedEffect(refreshTrigger.intValue) {
         while(true) {
             delay(1000)
-            refreshTrigger.intValue = refreshTrigger.intValue + 1
+            refreshTrigger.intValue += 1
         }
     }
 
@@ -363,137 +319,42 @@ fun DebugScreen(navController: NavController) {
     }
 
     LaunchedEffect(packetLogs.size, refreshTrigger.intValue) {
-        if (shouldScrollToBottom.value && packetLogs.isNotEmpty()) {
+        if (packetLogs.isNotEmpty()) {
             listState.animateScrollToItem(packetLogs.size - 1)
         }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Debug") },
-                navigationIcon = {
-                    TextButton(
-                        onClick = { navController.popBackStack() },
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        val sharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Back",
-                            tint = if (isSystemInDarkTheme()) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                            modifier = Modifier.scale(1.5f)
-                        )
-                        Text(
-                            sharedPreferences.getString("name", "AirPods")!!,
-                            style = TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isSystemInDarkTheme()) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                                fontFamily = FontFamily(Font(R.font.sf_pro))
-                            ),
-                        )
-                    }
-                },
-                actions = {
-                    Box {
-                        IconButton(onClick = { showMenu.value = true }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More Options",
-                                tint = if (isSystemInDarkTheme()) Color.White else Color.Black
-                            )
-                        }
+    val isDarkTheme = isSystemInDarkTheme()
 
-                        DropdownMenu(
-                            expanded = showMenu.value,
-                            onDismissRequest = { showMenu.value = false },
-                            modifier = Modifier
-                                .width(250.dp)
-                                .background(
-                                    if (isSystemInDarkTheme()) Color(0xFF1C1B20) else Color(0xFFF2F2F7)
-                                )
-                                .padding(vertical = 4.dp)
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            "Auto-scroll",
-                                            style = TextStyle(
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Normal
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        IOSCheckbox(
-                                            checked = shouldScrollToBottom.value,
-                                            onCheckedChange = { shouldScrollToBottom.value = it }
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    shouldScrollToBottom.value = !shouldScrollToBottom.value
-                                    showMenu.value = false
-                                }
-                            )
-
-                            HorizontalDivider(
-                                color = if (isSystemInDarkTheme()) Color(0xFF3A3A3C) else Color(0xFFE5E5EA),
-                                thickness = 0.5.dp
-                            )
-
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            "Clear logs",
-                                            style = TextStyle(
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Normal
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Clear logs",
-                                            tint = if (isSystemInDarkTheme()) Color(0xFF007AFF) else Color(0xFF3C6DF5)
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    ServiceManager.getService()?.clearLogs()
-                                    expandedItems.value = emptySet()
-                                    showMenu.value = false
-                                }
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.hazeEffect(
-                    state = hazeState,
-                    style = CupertinoMaterials.thick(),
-                    block = fun HazeEffectScope.() {
-                        alpha = if (scrollOffset > 0) 1f else 0f
-                    }),
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+    StyledScaffold(
+        title = "Debug",
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
         },
-        containerColor = if (isSystemInDarkTheme()) Color(0xFF000000) else Color(0xFFF2F2F7),
-    ) { paddingValues ->
+        actionButtons = listOf(
+            {
+                StyledIconButton(
+                    onClick = {
+                        airPodsService?.clearLogs()
+                        expandedItems.value = emptySet()
+                    },
+                    icon = "􀈑",
+                    darkMode = isDarkTheme,
+                )
+            }
+        ),
+    ) { spacerHeight, hazeState ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .hazeSource(hazeState)
-                .padding(top = paddingValues.calculateTopPadding())
                 .navigationBarsPadding()
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -509,7 +370,7 @@ fun DebugScreen(navController: NavController) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp, horizontal = 4.dp)
+                                .padding(vertical = 2.dp)
                                 .combinedClickable(
                                     onClick = {
                                         expandedItems.value = if (isExpanded) {
@@ -528,67 +389,65 @@ fun DebugScreen(navController: NavController) {
                                 containerColor = if (isSystemInDarkTheme()) Color(0xFF1C1B20) else Color(0xFFF2F2F7),
                             )
                         ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = if (isSent) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = if (isSent) Color.Green else Color.Red,
-                                        modifier = Modifier.size(24.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isSent) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = if (isSent) Color.Green else Color.Red,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column {
+                                    Text(
+                                        text = if (packetInfo.isUnknown) {
+                                            val shortenedData = packetInfo.rawData.take(60) +
+                                                (if (packetInfo.rawData.length > 60) "..." else "")
+                                            shortenedData
+                                        } else {
+                                            "${packetInfo.type}: ${packetInfo.description}"
+                                        },
+                                        style = TextStyle(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            fontFamily = FontFamily(Font(R.font.hack))
+                                        )
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Column {
+                                    if (isExpanded) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        if (packetInfo.parsedData.isNotEmpty()) {
+                                            packetInfo.parsedData.forEach { (key, value) ->
+                                                Row {
+                                                    Text(
+                                                        text = "$key: ",
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily(Font(R.font.hack))
+                                                        ),
+                                                        color = Color.Gray
+                                                    )
+                                                    Text(
+                                                        text = value,
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            fontFamily = FontFamily(Font(R.font.hack))
+                                                        ),
+                                                        color = Color.Gray
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                        }
+
                                         Text(
-                                            text = if (packetInfo.isUnknown) {
-                                                val shortenedData = packetInfo.rawData.take(60) +
-                                                    (if (packetInfo.rawData.length > 60) "..." else "")
-                                                shortenedData
-                                            } else {
-                                                "${packetInfo.type}: ${packetInfo.description}"
-                                            },
+                                            text = "Raw: ${packetInfo.rawData}",
                                             style = TextStyle(
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium,
                                                 fontFamily = FontFamily(Font(R.font.hack))
-                                            )
+                                            ),
+                                            color = Color.Gray
                                         )
-                                        if (isExpanded) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-
-                                            if (packetInfo.parsedData.isNotEmpty()) {
-                                                packetInfo.parsedData.forEach { (key, value) ->
-                                                    Row {
-                                                        Text(
-                                                            text = "$key: ",
-                                                            style = TextStyle(
-                                                                fontSize = 12.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontFamily = FontFamily(Font(R.font.hack))
-                                                            ),
-                                                            color = Color.Gray
-                                                        )
-                                                        Text(
-                                                            text = value,
-                                                            style = TextStyle(
-                                                                fontSize = 12.sp,
-                                                                fontFamily = FontFamily(Font(R.font.hack))
-                                                            ),
-                                                            color = Color.Gray
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                            }
-
-                                            Text(
-                                                text = "Raw: ${packetInfo.rawData}",
-                                                style = TextStyle(
-                                                    fontSize = 12.sp,
-                                                    fontFamily = FontFamily(Font(R.font.hack))
-                                                ),
-                                                color = Color.Gray
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -627,7 +486,7 @@ fun DebugScreen(navController: NavController) {
                                     packet.value = TextFieldValue("")
                                     focusManager.clearFocus()
 
-                                    if (shouldScrollToBottom.value && packetLogs.isNotEmpty()) {
+                                    if (packetLogs.isNotEmpty()) {
                                         coroutineScope.launch {
                                             try {
                                                 delay(100)

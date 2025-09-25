@@ -20,19 +20,17 @@
 
 package me.kavishdevar.librepods.composables
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -40,12 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import me.kavishdevar.librepods.R
-import me.kavishdevar.librepods.services.ServiceManager
+import me.kavishdevar.librepods.utils.AACPManager
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @Composable
-fun AudioSettings() {
+fun AudioSettings(navController: NavController) {
     val isDarkTheme = isSystemInDarkTheme()
     val textColor = if (isDarkTheme) Color.White else Color.Black
 
@@ -63,12 +63,18 @@ fun AudioSettings() {
 
     Column(
         modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
             .fillMaxWidth()
             .background(backgroundColor, RoundedCornerShape(14.dp))
             .padding(top = 2.dp)
     ) {
 
-        PersonalizedVolumeSwitch()
+        StyledToggle(
+            label = stringResource(R.string.personalized_volume),
+            description = stringResource(R.string.personalized_volume_description),
+            controlCommandIdentifier = AACPManager.Companion.ControlCommandIdentifiers.ADAPTIVE_VOLUME_CONFIG,
+            independent = false
+        )
         HorizontalDivider(
             thickness = 1.5.dp,
             color = Color(0x40888888),
@@ -76,7 +82,12 @@ fun AudioSettings() {
                 .padding(start = 12.dp, end = 0.dp)
         )
 
-        ConversationalAwarenessSwitch()
+        StyledToggle(
+            label = stringResource(R.string.conversational_awareness),
+            description = stringResource(R.string.conversational_awareness_description),
+            controlCommandIdentifier = AACPManager.Companion.ControlCommandIdentifiers.CONVERSATION_DETECT_CONFIG,
+            independent = false
+        )
         HorizontalDivider(
             thickness = 1.5.dp,
             color = Color(0x40888888),
@@ -92,39 +103,17 @@ fun AudioSettings() {
                 .padding(start = 12.dp, end = 0.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.adaptive_audio),
-                modifier = Modifier
-                    .padding(end = 8.dp, bottom = 2.dp, start = 2.dp)
-                    .fillMaxWidth(),
-                style = TextStyle(
-                    fontSize = 16.sp,
-                    color = textColor
-                )
-            )
-            Text(
-                text = stringResource(R.string.adaptive_audio_description),
-                modifier = Modifier
-                    .padding(bottom = 8.dp, top = 2.dp)
-                    .padding(end = 2.dp, start = 2.dp)
-                    .fillMaxWidth(),
-                style = TextStyle(
-                    fontSize = 12.sp,
-                    color = textColor.copy(alpha = 0.6f)
-                )
-            )
-            AdaptiveStrengthSlider()
-        }
+        NavigationButton(
+            to = "adaptive_strength",
+            name = stringResource(R.string.adaptive_audio),
+            navController = navController,
+            independent = false
+        )
     }
 }
 
 @Preview
 @Composable
 fun AudioSettingsPreview() {
-    AudioSettings()
+    AudioSettings(rememberNavController())
 }

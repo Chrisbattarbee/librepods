@@ -16,40 +16,51 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-@file:OptIn(ExperimentalEncodingApi::class)
+package me.kavishdevar.librepods.screens
 
-package me.kavishdevar.librepods.composables
-
+import android.annotation.SuppressLint
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
+import me.kavishdevar.librepods.composables.StyledSlider
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.AACPManager
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.math.roundToInt
 
+private var debounceJob: Job? = null
+
+@SuppressLint("DefaultLocale")
+@ExperimentalHazeMaterialsApi
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalEncodingApi::class)
 @Composable
-fun AdaptiveStrengthSlider() {
+fun AdaptiveStrengthScreen(navController: NavController) {
+    val isDarkTheme = isSystemInDarkTheme()
+
     val sliderValue = remember { mutableFloatStateOf(0f) }
     val service = ServiceManager.getService()!!
+
     LaunchedEffect(sliderValue) {
         val sliderValueFromAACP = service.aacpManager.controlCommandStatusList.find {
             it.identifier == AACPManager.Companion.ControlCommandIdentifiers.AUTO_ANC_STRENGTH
@@ -82,38 +93,44 @@ fun AdaptiveStrengthSlider() {
         }
     }
 
-    val isDarkTheme = isSystemInDarkTheme()
 
-    val trackColor = if (isDarkTheme) Color(0xFFB3B3B3) else Color(0xFFD9D9D9)
-    val thumbColor = if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFFFFFFFF)
-    val labelTextColor = if (isDarkTheme) Color.White else Color.Black
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        StyledSlider(
-            mutableFloatState = sliderValue,
-            onValueChange = {
-                sliderValue.floatValue = snapIfClose(it, listOf(0f, 50f, 100f))
-            },
-            valueRange = 0f..100f,
-            snapPoints = listOf(0f, 50f, 100f),
-            startLabel = stringResource(R.string.less_noise),
-            endLabel = stringResource(R.string.more_noise),
-            independent = false
-        )
+    StyledScaffold(
+        title = stringResource(R.string.customize_adaptive_audio),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
+            )
+        }
+    ) { spacerHeight ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
+            StyledSlider(
+                label = stringResource(R.string.customize_adaptive_audio).uppercase(),
+                mutableFloatState = sliderValue,
+                onValueChange = {
+                    sliderValue.floatValue = it
+                    debounceJob?.cancel()
+                    debounceJob = CoroutineScope(Dispatchers.Default).launch {
+                        delay(300)
+                        service.aacpManager.sendControlCommand(
+                            AACPManager.Companion.ControlCommandIdentifiers.AUTO_ANC_STRENGTH.value,
+                            (100 - it).toInt()
+                        )
+                    }
+                },
+                valueRange = 0f..100f,
+                snapPoints = listOf(0f, 50f, 100f),
+                startIcon = "􀊥",
+                endIcon = "􀊩",
+                independent = true,
+                description = stringResource(R.string.adaptive_audio_description)
+            )
+        }
     }
-}
-
-@Preview
-@Composable
-fun AdaptiveStrengthSliderPreview() {
-    AdaptiveStrengthSlider()
-}
-
-private fun snapIfClose(value: Float, points: List<Float>, threshold: Float = 0.05f): Float {
-    val nearest = points.minByOrNull { kotlin.math.abs(it - value) } ?: value
-    return if (kotlin.math.abs(nearest - value) <= threshold) nearest else value
 }

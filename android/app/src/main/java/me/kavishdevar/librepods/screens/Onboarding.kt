@@ -39,25 +39,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -78,14 +71,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.navigation.NavController
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.utils.RadareOffsetFinder
-import androidx.core.content.edit
 
+@ExperimentalHazeMaterialsApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Onboarding(navController: NavController, activityContext: Context) {
@@ -104,7 +101,6 @@ fun Onboarding(navController: NavController, activityContext: Context) {
     var moduleEnabled by remember { mutableStateOf(false) }
     var bluetoothToggled by remember { mutableStateOf(false) }
 
-    var showMenu by remember { mutableStateOf(false) }
     var showSkipDialog by remember { mutableStateOf(false) }
 
     fun checkRootAccess() {
@@ -155,55 +151,27 @@ fun Onboarding(navController: NavController, activityContext: Context) {
             isComplete = true
         }
     }
-
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "Setting Up",
-                        fontFamily = FontFamily(Font(R.font.sf_pro)),
-                        fontWeight = FontWeight.Medium
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More Options"
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Skip Setup") },
-                                onClick = {
-                                    showMenu = false
-                                    showSkipDialog = true
-                                }
-                            )
-                        }
-                    }
-                }
-            )
-        },
-        containerColor = if (isDarkTheme) Color(0xFF000000) else Color(0xFFF2F2F7)
-    ) { paddingValues ->
+    StyledScaffold(
+        title = "Setting Up",
+        actionButtons = listOf(
+            {
+                StyledIconButton(
+                    onClick = {
+                        showSkipDialog = true
+                    },
+                    icon = "􀊋",
+                    darkMode = isDarkTheme
+                )
+            }
+        )
+    ) { spacerHeight ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
+                .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(spacerHeight))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -300,7 +268,8 @@ fun Onboarding(navController: NavController, activityContext: Context) {
                         Spacer(modifier = Modifier.height(24.dp))
 
                         AnimatedContent(
-                            targetState = if (hasStarted) getStatusTitle(progressState, isComplete, moduleEnabled, bluetoothToggled) else "Setup Required",
+                            targetState = if (hasStarted) getStatusTitle(progressState,
+                                moduleEnabled, bluetoothToggled) else "Setup Required",
                             transitionSpec = { fadeIn() togetherWith fadeOut() }
                         ) { text ->
                             Text(
@@ -319,7 +288,7 @@ fun Onboarding(navController: NavController, activityContext: Context) {
 
                         AnimatedContent(
                             targetState = if (hasStarted)
-                                getStatusDescription(progressState, isComplete, moduleEnabled, bluetoothToggled)
+                                getStatusDescription(progressState, moduleEnabled, bluetoothToggled)
                             else
                                 "AirPods functionality requires one-time setup for hooking into Bluetooth library",
                             transitionSpec = { fadeIn() togetherWith fadeOut() }
@@ -608,7 +577,6 @@ private fun StatusIcon(
 
 private fun getStatusTitle(
     state: RadareOffsetFinder.ProgressState,
-    isComplete: Boolean,
     moduleEnabled: Boolean,
     bluetoothToggled: Boolean
 ): String {
@@ -635,7 +603,6 @@ private fun getStatusTitle(
 
 private fun getStatusDescription(
     state: RadareOffsetFinder.ProgressState,
-    isComplete: Boolean,
     moduleEnabled: Boolean,
     bluetoothToggled: Boolean
 ): String {
@@ -660,6 +627,7 @@ private fun getStatusDescription(
     }
 }
 
+@ExperimentalHazeMaterialsApi
 @Preview
 @Composable
 fun OnboardingPreview() {

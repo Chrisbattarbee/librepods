@@ -41,25 +41,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -74,22 +64,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -99,22 +83,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.chrisbanes.haze.HazeEffectScope
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
-import me.kavishdevar.librepods.composables.IndependentToggle
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
+import me.kavishdevar.librepods.composables.StyledToggle
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.HeadTracking
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -134,147 +115,59 @@ fun HeadTrackingScreen(navController: NavController) {
             ServiceManager.getService()?.stopHeadTracking()
         }
     }
-    val sharedPreferences = LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val isDarkTheme = isSystemInDarkTheme()
     val backgroundColor = if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
     val textColor = if (isDarkTheme) Color.White else Color.Black
 
     val scrollState = rememberScrollState()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val hazeState = remember { HazeState() }
 
-    var mDensity by remember { mutableFloatStateOf(0f) }
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                modifier = Modifier.hazeEffect(
-                    state = hazeState,
-                    style = CupertinoMaterials.thick(),
-                    block = fun HazeEffectScope.() {
-                        alpha =
-                            if (scrollState.value > 60.dp.value * mDensity) 1f else 0f
-                    })
-                    .drawBehind {
-                        mDensity = density
-                        val strokeWidth = 0.7.dp.value * density
-                        val y = size.height - strokeWidth / 2
-                        if (scrollState.value > 60.dp.value * density) {
-                            drawLine(
-                                if (isDarkTheme) Color.DarkGray else Color.LightGray,
-                                Offset(0f, y),
-                                Offset(size.width, y),
-                                strokeWidth
-                            )
-                        }
-                    },
-                title = {
-                    Text(
-                        stringResource(R.string.head_tracking),
-                        fontFamily = FontFamily(Font(R.font.sf_pro)),
-                    )
-                },
-                navigationIcon = {
-                    TextButton(
-                        onClick = {
-                            navController.popBackStack()
-                            if (ServiceManager.getService()?.isHeadTrackingActive == true) ServiceManager.getService()?.stopHeadTracking()
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.width(180.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Back",
-                            tint = if (isDarkTheme)  Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                            modifier = Modifier.scale(1.5f)
-                        )
-                        Text(
-                            sharedPreferences.getString("name", "AirPods")!!,
-                            style = TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                                fontFamily = FontFamily(Font(R.font.sf_pro))
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                actions = {
-                    var isActive by remember { mutableStateOf(ServiceManager.getService()?.isHeadTrackingActive == true) }
-                    IconButton(
-                        onClick = {
-                            if (ServiceManager.getService()?.isHeadTrackingActive == false) {
-                                ServiceManager.getService()?.startHeadTracking()
-                                Log.d("HeadTrackingScreen", "Head tracking started")
-                                isActive = true
-                            } else {
-                                ServiceManager.getService()?.stopHeadTracking()
-                                Log.d("HeadTrackingScreen", "Head tracking stopped")
-                                isActive = false
-                            }
-                      },
-                    ) {
-                        Icon(
-                            if (isActive) {
-                                ImageVector.Builder(
-                                    name = "Pause",
-                                    defaultWidth = 24.dp,
-                                    defaultHeight = 24.dp,
-                                    viewportWidth = 24f,
-                                    viewportHeight = 24f
-                                ).apply {
-                                    path(
-                                        fill = SolidColor(Color.Black),
-                                        pathBuilder = {
-                                            moveTo(6f, 5f)
-                                            lineTo(10f, 5f)
-                                            lineTo(10f, 19f)
-                                            lineTo(6f, 19f)
-                                            lineTo(6f, 5f)
-                                            moveTo(14f, 5f)
-                                            lineTo(18f, 5f)
-                                            lineTo(18f, 19f)
-                                            lineTo(14f, 19f)
-                                            lineTo(14f, 5f)
-                                        }
-                                    )
-                                }.build()
-                            } else Icons.Filled.PlayArrow,
-                            contentDescription = "Start",
-                            tint = if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                            modifier = Modifier.scale(1.5f)
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
+    StyledScaffold (
+        title = stringResource(R.string.head_tracking),
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
         },
-        containerColor = if (isSystemInDarkTheme()) Color(0xFF000000)
-        else Color(0xFFF2F2F7),
-    ) { paddingValues ->
+        actionButtons = listOf(
+            {
+               var isActive by remember { mutableStateOf(ServiceManager.getService()?.isHeadTrackingActive == true) }
+                StyledIconButton(
+                    onClick = {
+                        if (ServiceManager.getService()?.isHeadTrackingActive == false) {
+                            ServiceManager.getService()?.startHeadTracking()
+                            Log.d("HeadTrackingScreen", "Head tracking started")
+                        } else {
+                            ServiceManager.getService()?.stopHeadTracking()
+                            Log.d("HeadTrackingScreen", "Head tracking stopped")
+                        }
+                    },
+                    icon = if (isActive) "􀊅" else "􀊃",
+                    darkMode = isDarkTheme
+                )
+            }
+        ),
+    ) { spacerHeight, hazeState ->
         Column (
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues = paddingValues)
-                .padding(horizontal = 16.dp)
                 .padding(top = 8.dp)
                 .verticalScroll(scrollState)
                 .hazeSource(state = hazeState)
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
             val sharedPreferences =
                 LocalContext.current.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
             var gestureText by remember { mutableStateOf("") }
             val coroutineScope = rememberCoroutineScope()
 
-            IndependentToggle(name = "Head Gestures", sharedPreferences = sharedPreferences)
+            StyledToggle(
+                label = "Head Gestures",
+                sharedPreferences = sharedPreferences,
+                sharedPreferenceKey = "head_gestures",
+                )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 stringResource(R.string.head_gestures_details),
@@ -302,7 +195,7 @@ fun HeadTrackingScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Acceleration",
+                "Velocity",
                 style = TextStyle(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
@@ -441,14 +334,13 @@ private fun ParticleText(
 
         if (particles.isEmpty()) {
             val random = Random(System.currentTimeMillis())
-            for (i in 0..100) {
+            for (@Suppress("Unused")i in 0..100) {
                 val x = centerX + random.nextFloat() * textBounds.width
                 val y = centerY - textBounds.height / 2 + random.nextFloat() * textBounds.height
                 val vx = (random.nextFloat() - 0.5f) * 20
                 val vy = (random.nextFloat() - 0.5f) * 20
                 particles.add(Particle(Offset(x, y), Offset(vx, vy)))
             }
-            textVisible = false
         }
 
         particles.forEach { particle ->
@@ -518,14 +410,12 @@ private fun HeadVisualization() {
                 fun rotate3D(point: Triple<Float, Float, Float>): Triple<Float, Float, Float> {
                     val (x, y, z) = point
                     val x1 = x * cosY - z * sinY
-                    val y1 = y
                     val z1 = x * sinY + z * cosY
 
-                    val x2 = x1
-                    val y2 = y1 * cosP - z1 * sinP
-                    val z2 = y1 * sinP + z1 * cosP
+                    val y2 = y * cosP - z1 * sinP
+                    val z2 = y * sinP + z1 * cosP
 
-                    return Triple(x2, y2, z2)
+                    return Triple(x1, y2, z2)
                 }
 
                 fun project(point: Triple<Float, Float, Float>): Pair<Float, Float> {

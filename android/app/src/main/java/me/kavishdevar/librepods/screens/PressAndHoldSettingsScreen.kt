@@ -30,24 +30,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,14 +63,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
 import androidx.navigation.NavController
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.composables.StyledIconButton
+import me.kavishdevar.librepods.composables.StyledScaffold
 import me.kavishdevar.librepods.constants.StemAction
 import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.AACPManager
 import kotlin.experimental.and
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-@Composable()
+@Composable
 fun RightDivider() {
     HorizontalDivider(
         thickness = 1.5.dp,
@@ -85,7 +83,7 @@ fun RightDivider() {
     )
 }
 
-@Composable()
+@Composable
 fun RightDividerNoIcon() {
     HorizontalDivider(
         thickness = 1.5.dp,
@@ -95,6 +93,7 @@ fun RightDividerNoIcon() {
     )
 }
 
+@ExperimentalHazeMaterialsApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LongPress(navController: NavController, name: String) {
@@ -114,60 +113,27 @@ fun LongPress(navController: NavController, name: String) {
     }
     val context = LocalContext.current
     val sharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    val deviceName = sharedPreferences.getString("name", "AirPods Pro")
     val prefKey = if (name.lowercase() == "left") "left_long_press_action" else "right_long_press_action"
     val longPressActionPref = sharedPreferences.getString(prefKey, StemAction.CYCLE_NOISE_CONTROL_MODES.name)
     Log.d("PressAndHoldSettingsScreen", "Long press action preference ($prefKey): $longPressActionPref")
     var longPressAction by remember { mutableStateOf(StemAction.valueOf(longPressActionPref ?: StemAction.CYCLE_NOISE_CONTROL_MODES.name)) }
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                        Text(
-                            name,
-                            fontFamily = FontFamily(Font(R.font.sf_pro)),
-                        )
-                    },
-                navigationIcon = {
-                    TextButton(
-                        onClick = {
-                            navController.popBackStack()
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Back",
-                            tint = if (isDarkTheme)  Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                            modifier = Modifier.scale(1.5f)
-                        )
-                        Text(
-                            deviceName?: "AirPods Pro",
-                            style = TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isDarkTheme) Color(0xFF007AFF) else Color(0xFF3C6DF5),
-                                fontFamily = FontFamily(Font(R.font.sf_pro))
-                            ),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+    StyledScaffold(
+        title = name,
+        navigationButton = {
+            StyledIconButton(
+                onClick = { navController.popBackStack() },
+                icon = "􀯶",
+                darkMode = isDarkTheme
             )
-        },
-        containerColor = if (isSystemInDarkTheme()) Color(0xFF000000)
-        else Color(0xFFF2F2F7),
-    ) { paddingValues ->
+        }
+    ) { spacerHeight ->
         val backgroundColor = if (isDarkTheme) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
         Column (
           modifier = Modifier
               .fillMaxSize()
-              .padding(paddingValues = paddingValues)
-              .padding(horizontal = 16.dp)
               .padding(top = 8.dp)
         ) {
+            Spacer(modifier = Modifier.height(spacerHeight))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,33 +187,37 @@ fun LongPress(navController: NavController, name: String) {
                         it.identifier == AACPManager.Companion.ControlCommandIdentifiers.ALLOW_OFF_OPTION
                     }?.value?.takeIf { it.isNotEmpty() }?.get(0)
                     val offListeningMode = offListeningModeValue == 1.toByte()
-                    LongPressElement(
+                    ListeningModeElement(
                         name = "Off",
                         enabled = offListeningMode,
                         resourceId =  R.drawable.noise_cancellation,
                         isFirst = true)
                     if (offListeningMode) RightDivider()
-                    LongPressElement(
+                    ListeningModeElement(
                         name = "Transparency",
                         resourceId = R.drawable.transparency,
                         isFirst = !offListeningMode)
                     RightDivider()
-                    LongPressElement(
+                    ListeningModeElement(
                         name = "Adaptive",
                         resourceId = R.drawable.adaptive)
                     RightDivider()
-                    LongPressElement(
+                    ListeningModeElement(
                         name = "Noise Cancellation",
                         resourceId = R.drawable.noise_cancellation,
                         isLast = true)
                 }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Press and hold the stem to cycle between the selected noise control modes.",
-                    fontSize = 16.sp,
-                    fontFamily = FontFamily(Font(R.font.sf_pro)),
-                    color = textColor.copy(alpha = 0.6f),
+                    text = "Press and hold the stem to cycle between the selected noise control modes.",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Light,
+                        color = textColor.copy(alpha = 0.6f),
+                        fontFamily = FontFamily(Font(R.font.sf_pro))
+                    ),
                     modifier = Modifier
-                        .padding(start = 16.dp, top = 4.dp)
+                        .padding(horizontal = 8.dp)
                 )
             }
         }
@@ -258,7 +228,7 @@ fun LongPress(navController: NavController, name: String) {
 }
 
 @Composable
-fun LongPressElement(name: String, enabled: Boolean = true, resourceId: Int, isFirst: Boolean = false, isLast: Boolean = false) {
+fun ListeningModeElement(name: String, enabled: Boolean = true, resourceId: Int, isFirst: Boolean = false, isLast: Boolean = false) {
     val bit = when (name) {
         "Off" -> 0x01
         "Transparency" -> 0x02
@@ -280,7 +250,7 @@ fun LongPressElement(name: String, enabled: Boolean = true, resourceId: Int, isF
     val isChecked = (byteValue.toInt() and bit) != 0
     val checked = remember { mutableStateOf(isChecked) }
 
-    Log.d("PressAndHoldSettingsScreen", "LongPressElement: $name, checked: ${checked.value}, byteValue: ${byteValue.toInt()}, in bits: ${byteValue.toInt().toString(2)}")
+    Log.d("PressAndHoldSettingsScreen", "ListeningModeElement: $name, checked: ${checked.value}, byteValue: ${byteValue.toInt()}, in bits: ${byteValue.toInt().toString(2)}")
     val darkMode = isSystemInDarkTheme()
     val textColor = if (darkMode) Color.White else Color.Black
     val desc = when (name) {

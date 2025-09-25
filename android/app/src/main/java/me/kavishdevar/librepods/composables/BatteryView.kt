@@ -24,14 +24,19 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,7 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
@@ -57,6 +62,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @Composable
 fun BatteryView(service: AirPodsService, preview: Boolean = false) {
     val batteryStatus = remember { mutableStateOf<List<Battery>>(listOf()) }
+
+    val previousBatteryStatus = remember { mutableStateOf<List<Battery>>(listOf()) }
+
     @Suppress("DEPRECATION") val batteryReceiver = remember {
         object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -96,15 +104,36 @@ fun BatteryView(service: AirPodsService, preview: Boolean = false) {
         }
     }
 
+    previousBatteryStatus.value = batteryStatus.value
     batteryStatus.value = service.getBattery()
 
     if (preview) {
         batteryStatus.value = listOf(
-            Battery(BatteryComponent.LEFT, 100, BatteryStatus.CHARGING),
-            Battery(BatteryComponent.RIGHT, 50, BatteryStatus.NOT_CHARGING),
-            Battery(BatteryComponent.CASE, 5, BatteryStatus.CHARGING)
+            Battery(BatteryComponent.LEFT, 100, BatteryStatus.NOT_CHARGING),
+            Battery(BatteryComponent.RIGHT, 94, BatteryStatus.NOT_CHARGING),
+            Battery(BatteryComponent.CASE, 40, BatteryStatus.CHARGING)
         )
+        previousBatteryStatus.value = batteryStatus.value
     }
+
+    val left = batteryStatus.value.find { it.component == BatteryComponent.LEFT }
+    val right = batteryStatus.value.find { it.component == BatteryComponent.RIGHT }
+    val case = batteryStatus.value.find { it.component == BatteryComponent.CASE }
+    val leftLevel = left?.level ?: 0
+    val rightLevel = right?.level ?: 0
+    val caseLevel = case?.level ?: 0
+    val leftCharging = left?.status == BatteryStatus.CHARGING
+    val rightCharging = right?.status == BatteryStatus.CHARGING
+    val caseCharging = case?.status == BatteryStatus.CHARGING
+
+    val prevLeft = previousBatteryStatus.value.find { it.component == BatteryComponent.LEFT }
+    val prevRight = previousBatteryStatus.value.find { it.component == BatteryComponent.RIGHT }
+    val prevCase = previousBatteryStatus.value.find { it.component == BatteryComponent.CASE }
+    val prevLeftCharging = prevLeft?.status == BatteryStatus.CHARGING
+    val prevRightCharging = prevRight?.status == BatteryStatus.CHARGING
+    val prevCaseCharging = prevCase?.status == BatteryStatus.CHARGING
+
+    val singleDisplayed = remember { mutableStateOf(false) }
 
     Row {
         Column (
@@ -117,43 +146,48 @@ fun BatteryView(service: AirPodsService, preview: Boolean = false) {
                 contentDescription = stringResource(R.string.buds),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .scale(0.80f)
+                    .padding(12.dp)
             )
-            val left = batteryStatus.value.find { it.component == BatteryComponent.LEFT }
-            val right = batteryStatus.value.find { it.component == BatteryComponent.RIGHT }
-            if ((right?.status == BatteryStatus.CHARGING && left?.status == BatteryStatus.CHARGING) || (left?.status == BatteryStatus.NOT_CHARGING && right?.status == BatteryStatus.NOT_CHARGING))
+            if (
+                leftCharging == rightCharging &&
+                (leftLevel - rightLevel) in -3..3
+            )
             {
-                BatteryIndicator(right.level.let { left.level.coerceAtMost(it) }, left.status == BatteryStatus.CHARGING)
+                BatteryIndicator(
+                    leftLevel.coerceAtMost(rightLevel),
+                    leftCharging,
+                    previousCharging = (prevLeftCharging && prevRightCharging)
+                )
+                singleDisplayed.value = true
             }
             else {
+                singleDisplayed.value = false
                 Row (
                     modifier = Modifier
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
-//                    if (left?.status != BatteryStatus.DISCONNECTED) {
-                    if (left?.level != null) {
+                    if (leftLevel > 0 || left?.status != BatteryStatus.DISCONNECTED) {
                         BatteryIndicator(
-                            left.level,
-                            left.status == BatteryStatus.CHARGING
+                            leftLevel,
+                            leftCharging,
+                            "\uDBC6\uDCE5",
+                            previousCharging = prevLeftCharging
                         )
                     }
-//                    }
-//                    if (left?.status != BatteryStatus.DISCONNECTED && right?.status != BatteryStatus.DISCONNECTED) {
-                    if (left?.level != null && right?.level != null)
+                    if (leftLevel > 0 && rightLevel > 0)
                     {
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
-//                    }
-//                    if (right?.status != BatteryStatus.DISCONNECTED) {
-                    if (right?.level != null)
+                    if (rightLevel > 0 || right?.status != BatteryStatus.DISCONNECTED)
                     {
                         BatteryIndicator(
-                            right.level,
-                            right.status == BatteryStatus.CHARGING
+                            rightLevel,
+                            rightCharging,
+                            "\uDBC6\uDCE8",
+                            previousCharging = prevRightCharging
                         )
                     }
-//                    }
                 }
             }
         }
@@ -163,26 +197,32 @@ fun BatteryView(service: AirPodsService, preview: Boolean = false) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val case = batteryStatus.value.find { it.component == BatteryComponent.CASE }
-
             Image(
                 bitmap = ImageBitmap.imageResource(R.drawable.pro_2_case),
                 contentDescription = stringResource(R.string.case_alt),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .scale(1.25f)
+                    .padding(12.dp)
             )
-//            if (case?.status != BatteryStatus.DISCONNECTED) {
-                if (case?.level != null) {
-                    BatteryIndicator(case.level, case.status == BatteryStatus.CHARGING)
+                if (caseLevel > 0 || case?.status != BatteryStatus.DISCONNECTED) {
+                    BatteryIndicator(
+                        caseLevel,
+                        caseCharging,
+                        prefix = if (!singleDisplayed.value) "\uDBC3\uDE6C" else "",
+                        previousCharging = prevCaseCharging
+                    )
                 }
-//            }
         }
     }
 }
 
-@Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun BatteryViewPreview() {
-    BatteryView(AirPodsService(), preview = true)
+    val bg = if (isSystemInDarkTheme()) Color.Black else Color(0xFFF2F2F7)
+    Box(
+        modifier = Modifier.background(bg)
+    ) {
+        BatteryView(AirPodsService(), preview = true)
+    }
 }

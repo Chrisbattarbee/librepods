@@ -1,4 +1,4 @@
-/*
+ /*
  * LibrePods - AirPods liberated from Apple’s ecosystem
  *
  * Copyright (C) 2025 LibrePods contributors
@@ -35,8 +35,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,10 +53,10 @@ import me.kavishdevar.librepods.services.ServiceManager
 import me.kavishdevar.librepods.utils.AACPManager
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-@Composable
+ @Composable
 fun PersonalizedVolumeSwitch() {
     val service = ServiceManager.getService()!!
-    
+
     val adaptiveVolumeEnabledValue = service.aacpManager.controlCommandStatusList.find {
         it.identifier == AACPManager.Companion.ControlCommandIdentifiers.ADAPTIVE_VOLUME_CONFIG
     }?.value?.takeIf { it.isNotEmpty() }?.get(0)
@@ -83,7 +83,7 @@ fun PersonalizedVolumeSwitch() {
             }
         }
     }
-    
+
     LaunchedEffect(Unit) {
         service.aacpManager.registerControlCommandListener(
             AACPManager.Companion.ControlCommandIdentifiers.ADAPTIVE_VOLUME_CONFIG,
