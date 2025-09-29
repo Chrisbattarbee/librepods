@@ -11,16 +11,17 @@
 
 ## What is LibrePods?
 
-LibrePods unlocks Apple's exclusive AirPods features on non-Apple devices. Get access to noise control modes, adaptive transparency, ear detection, battery status, and more - all the premium features you paid for but Apple locked to their ecosystem.
+LibrePods unlocks Apple's exclusive AirPods features on non-Apple devices. Get access to noise control modes, adaptive transparency, ear detection, hearing aid, customized transparency mode, battery status, and more - all the premium features you paid for but Apple locked to their ecosystem.
 
 ## Device Compatibility
 
 | Status | Device | Features |
 |--------|--------|----------|
 | ✅ | AirPods Pro (2nd Gen) | Fully supported and tested |
+| ✅ | AirPods Pro (3rd Gen) | Fully supported (except heartrate monitoring) |
 | ⚠️ | Other AirPods models | Basic features (battery status, ear detection) should work |
 
-Most features should work with any AirPods. Currently, testing is only performed with AirPods Pro 2.
+Most features should work with any AirPods. Currently, I've only got AirPods Pro 2 to test with.
 
 ## Key Features
 
