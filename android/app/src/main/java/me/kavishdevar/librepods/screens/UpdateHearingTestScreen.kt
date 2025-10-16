@@ -94,7 +94,7 @@ fun UpdateHearingTestScreen(@Suppress("unused") navController: NavController) {
     val aacpManager = remember { ServiceManager.getService()?.aacpManager }
     val backdrop = rememberLayerBackdrop()
     StyledScaffold(
-        title = stringResource(R.string.adjustments)
+        title = stringResource(R.string.hearing_test)
     ) { spacerHeight, hazeState ->
         Column(
             modifier = Modifier

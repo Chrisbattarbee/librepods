@@ -1,6 +1,4 @@
-<resources
-    xmlns:tools="http://schemas.android.com/tools"
-    tools:ignore="MissingTranslation">
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_name" translatable="false">LibrePods</string>
     <string name="app_description">Liberate your AirPods from Apple\'s ecosystem.</string>
     <string name="app_widget_description">See your AirPods battery status right from your home screen!</string>
@@ -185,6 +183,7 @@
     <string name="app_listener_service_label">Camera listener</string>
     <string name="app_listener_service_description">Listener service for LibrePods to detect when the camera is active to activate camera control on AirPods.</string>
     <string name="open_source_licenses">Open Source Licenses</string>
+    <string name="hearing_test">Update Hearing Test</string>
     <string name="update_hearing_test">Update Hearing Test Result</string>
     <string name="att_manager_is_null_try_reconnecting">ATT Manager is null, Try reconnecting.</string>
     <string name="permissions_required">The following permissions are required to use the app. Please grant them to continue.</string>
