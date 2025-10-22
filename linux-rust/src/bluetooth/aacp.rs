@@ -676,11 +676,11 @@ impl AACPManager {
         buffer.extend_from_slice(&[0x01, 0xE5, 0x4A]);
         buffer.extend_from_slice(b"playingApp");
         buffer.push(0x42);
-        buffer.extend_from_slice(b"NA");;
+        buffer.extend_from_slice(b"NA");
         buffer.push(0x52);
         buffer.extend_from_slice(b"hostStreamingState");
         buffer.push(0x42);
-        buffer.extend_from_slice(b"NO");;
+        buffer.extend_from_slice(b"NO");
         buffer.push(0x49);
         buffer.extend_from_slice(b"btAddress");
         buffer.push(0x51);

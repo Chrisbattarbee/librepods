@@ -1,6 +1,6 @@
 use crate::bluetooth::aacp::{AACPManager, ProximityKeyType, AACPEvent};
 use crate::bluetooth::aacp::ControlCommandIdentifiers;
-use crate::bluetooth::att::ATTManager;
+// use crate::bluetooth::att::ATTManager;
 use crate::media_controller::MediaController;
 use bluer::Address;
 use log::{debug, info, error};
@@ -13,7 +13,7 @@ use crate::ui::tray::MyTray;
 pub struct AirPodsDevice {
     pub mac_address: Address,
     pub aacp_manager: AACPManager,
-    pub att_manager: ATTManager,
+    // pub att_manager: ATTManager,
     pub media_controller: Arc<Mutex<MediaController>>,
 }
 
@@ -23,8 +23,8 @@ impl AirPodsDevice {
         let mut aacp_manager = AACPManager::new();
         aacp_manager.connect(mac_address).await;
 
-        let mut att_manager = ATTManager::new();
-        att_manager.connect(mac_address).await.expect("Failed to connect ATT");
+        // let mut att_manager = ATTManager::new();
+        // att_manager.connect(mac_address).await.expect("Failed to connect ATT");
 
         tray_handle.update(|tray: &mut MyTray| tray.connected = true).await;
 
@@ -214,7 +214,7 @@ impl AirPodsDevice {
         AirPodsDevice {
             mac_address,
             aacp_manager,
-            att_manager,
+            // att_manager,
             media_controller,
         }
     }
