@@ -52,7 +52,9 @@ impl Display for DeviceState {
 
 #[derive(Clone, Debug)]
 pub struct AirPodsState {
+    pub device_name: String,
     pub conversation_awareness_enabled: bool,
+    pub personalized_volume_enabled: bool,
 }
 
 #[derive(Clone, Debug)]

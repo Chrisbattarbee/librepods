@@ -37,5 +37,6 @@ pub async fn find_other_managed_devices(adapter: &Adapter, managed_macs: Vec<Str
     if !devices.is_empty() {
         return Ok(devices);
     }
+    debug!("No other managed devices found");
     Err(bluer::Error::from(Error::new(std::io::ErrorKind::NotFound, "No other managed devices found")))
 }

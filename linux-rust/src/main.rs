@@ -14,16 +14,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use crate::bluetooth::discovery::{find_connected_airpods, find_other_managed_devices};
 use devices::airpods::AirPodsDevice;
-use bluer::Address;
+use bluer::{Address, InternalErrorKind};
 use ksni::TrayMethods;
 use crate::ui::tray::MyTray;
 use clap::Parser;
 use crate::bluetooth::le::start_le_monitor;
 use tokio::sync::mpsc::unbounded_channel;
-use crate::bluetooth::att::ATTHandles;
-use crate::bluetooth::managers::BluetoothManager;
+use tokio::sync::RwLock;
+use crate::bluetooth::managers::DeviceManagers;
 use crate::devices::enums::DeviceData;
-use crate::ui::messages::{AirPodsCommand, BluetoothUIMessage, NothingCommand, UICommand};
+use crate::ui::messages::BluetoothUIMessage;
 use crate::utils::get_devices_path;
 
 #[derive(Parser)]
@@ -40,27 +40,28 @@ fn main() -> iced::Result {
     let args = Args::parse();
     let log_level = if args.debug { "debug" } else { "info" };
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", log_level.to_owned() + ",iced_wgpu=off,wgpu_hal=off,wgpu_core=off,librepods_rust::bluetooth::le=off,cosmic_text=off,naga=off,iced_winit=off") };
+        unsafe { env::set_var("RUST_LOG", log_level.to_owned() + ",winit=warn,tracing=warn,,iced_wgpu=warn,wgpu_hal=warn,wgpu_core=warn,librepods_rust::bluetooth::le=warn,cosmic_text=warn,naga=warn,iced_winit=warn") };
     }
     env_logger::init();
 
     let (ui_tx, ui_rx) = unbounded_channel::<BluetoothUIMessage>();
-    let (ui_command_tx, ui_command_rx) = unbounded_channel::<UICommand>();
 
+    let device_managers: Arc<RwLock<HashMap<String, DeviceManagers>>> = Arc::new(RwLock::new(HashMap::new()));
+    let device_managers_clone = device_managers.clone();
     std::thread::spawn(|| {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async_main(ui_tx, ui_command_rx)).unwrap();
+        rt.block_on(async_main(ui_tx, device_managers_clone)).unwrap();
     });
 
-    ui::window::start_ui(ui_rx, args.start_minimized, ui_command_tx)
+    ui::window::start_ui(ui_rx, args.start_minimized, device_managers)
 }
 
 
-async fn async_main(ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage>, mut ui_command_rx: tokio::sync::mpsc::UnboundedReceiver<UICommand>) -> bluer::Result<()> {
+async fn async_main(
+    ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage>,
+    device_managers: Arc<RwLock<HashMap<String, DeviceManagers>>>,
+) -> bluer::Result<()> {
     let args = Args::parse();
-
-    // let mut device_command_txs: HashMap<String, tokio::sync::mpsc::UnboundedSender<(ControlCommandIdentifiers, Vec<u8>)>> = HashMap::new();
-    let mut device_managers: HashMap<String, Arc<BluetoothManager>> = HashMap::new();
 
     let mut managed_devices_mac: Vec<String> = Vec::new(); // includes ony non-AirPods. AirPods handled separately.
 
@@ -125,12 +126,15 @@ async fn async_main(ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage
             let ui_tx_clone = ui_tx.clone();
             ui_tx_clone.send(BluetoothUIMessage::DeviceConnected(device.address().to_string())).unwrap();
             let airpods_device = AirPodsDevice::new(device.address(), tray_handle.clone(), ui_tx_clone).await;
-            // device_command_txs.insert(device.address().to_string(), airpods_device.command_tx.unwrap());
-            // device_managers.insert(device.address().to_string(), Arc::new(airpods_device.aacp_manager));
-            device_managers.insert(
-                device.address().to_string(),
-                Arc::from(BluetoothManager::AACP(Arc::new(airpods_device.aacp_manager))),
-            );
+
+            let mut managers = device_managers.write().await;
+            let dev_managers = DeviceManagers::with_aacp(airpods_device.aacp_manager.clone());
+            managers
+                .entry(device.address().to_string())
+                .or_insert(dev_managers)
+                .set_aacp(airpods_device.aacp_manager)
+            ;
+            drop(managers)
         }
         Err(_) => {
             info!("No connected AirPods found.");
@@ -144,30 +148,37 @@ async fn async_main(ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage
                 info!("Found connected managed device: {}, initializing.", addr_str);
                 let type_ = devices_list.get(&addr_str).unwrap().type_.clone();
                 let ui_tx_clone = ui_tx.clone();
-                let mut device_managers = device_managers.clone();
+                let device_managers = device_managers.clone();
                 tokio::spawn(async move {
                     ui_tx_clone.send(BluetoothUIMessage::DeviceConnected(addr_str.clone())).unwrap();
+                    let mut managers = device_managers.write().await;
                     match type_ {
                         devices::enums::DeviceType::Nothing => {
                             let dev = devices::nothing::NothingDevice::new(device.address(), ui_tx_clone).await;
-                            device_managers.insert(
-                                addr_str,
-                                Arc::from(BluetoothManager::ATT(Arc::new(dev.att_manager))),
-                            );
+                            let dev_managers = DeviceManagers::with_att(dev.att_manager.clone());
+                            managers
+                                .entry(addr_str)
+                                .or_insert(dev_managers)
+                                .set_att(dev.att_manager);
                         }
                         _ => {}
                     }
+                    drop(managers)
                 });
             }
         }
         Err(e) => {
-            log::error!("Error finding connected managed devices: {}", e);
+            log::debug!("type of error: {:?}", e.kind);
+            if e.kind != bluer::ErrorKind::Internal(InternalErrorKind::Io(std::io::ErrorKind::NotFound)) {
+                log::error!("Error finding other managed devices: {}", e);
+            } else {
+                info!("No other managed devices found.");
+            }
         }
     }
 
     let conn = Connection::new_system()?;
     let rule = MatchRule::new_signal("org.freedesktop.DBus.Properties", "PropertiesChanged");
-    let device_managers_clone = device_managers.clone();
     conn.add_match(rule, move |_: (), conn, msg| {
         let Some(path) = msg.path() else { return true; };
         if !path.contains("/org/bluez/hci") || !path.contains("/dev_") {
@@ -198,14 +209,17 @@ async fn async_main(ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage
             match type_ {
                 devices::enums::DeviceType::Nothing => {
                     let ui_tx_clone = ui_tx.clone();
-                    let mut device_managers = device_managers.clone();
+                    let device_managers = device_managers.clone();
                     tokio::spawn(async move {
+                        let mut managers = device_managers.write().await;
                         ui_tx_clone.send(BluetoothUIMessage::DeviceConnected(addr_str.clone())).unwrap();
                         let dev = devices::nothing::NothingDevice::new(addr, ui_tx_clone).await;
-                        device_managers.insert(
-                            addr_str,
-                            Arc::from(BluetoothManager::ATT(Arc::new(dev.att_manager))),
-                        );
+                        let dev_managers = DeviceManagers::with_att(dev.att_manager.clone());
+                        managers
+                            .entry(addr_str)
+                            .or_insert(dev_managers)
+                            .set_att(dev.att_manager);
+                        drop(managers);
                     });
                 }
                 _ => {}
@@ -220,85 +234,20 @@ async fn async_main(ui_tx: tokio::sync::mpsc::UnboundedSender<BluetoothUIMessage
         info!("AirPods connected: {}, initializing", name);
         let handle_clone = tray_handle.clone();
         let ui_tx_clone = ui_tx.clone();
-        let mut device_managers = device_managers.clone();
+        let device_managers = device_managers.clone();
         tokio::spawn(async move {
             ui_tx_clone.send(BluetoothUIMessage::DeviceConnected(addr_str.clone())).unwrap();
             let airpods_device = AirPodsDevice::new(addr, handle_clone, ui_tx_clone).await;
-            device_managers.insert(
-                addr_str,
-                Arc::from(BluetoothManager::AACP(Arc::new(airpods_device.aacp_manager))),
-            );
+            let mut managers = device_managers.write().await;
+            let dev_managers = DeviceManagers::with_aacp(airpods_device.aacp_manager.clone());
+            managers
+                .entry(addr_str)
+                .or_insert(dev_managers)
+                .set_aacp(airpods_device.aacp_manager);
+            drop(managers);
         });
         true
     })?;
-    tokio::spawn(async move {
-        while let Some(command) = ui_command_rx.recv().await {
-            match command {
-                UICommand::AirPods(AirPodsCommand::SetControlCommandStatus(mac, identifier, value)) => {
-                    if let Some(manager) = device_managers_clone.get(&mac) {
-                        match manager.as_ref() {
-                            BluetoothManager::AACP(manager) => {
-                                log::debug!("Sending control command to device {}: {:?} = {:?}", mac, identifier, value);
-                                if let Err(e) = manager.send_control_command(identifier, value.as_ref()).await {
-                                    log::error!("Failed to send control command to device {}: {}", mac, e);
-                                }
-                            }
-                            _ => {
-                                log::warn!("AACP not available for {}", mac);
-                            }
-                        }
-                    } else {
-                        log::warn!("No manager for device {}", mac);
-                    }
-                }
-                UICommand::AirPods(AirPodsCommand::RenameDevice(mac, new_name)) => {
-                    if let Some(manager) = device_managers_clone.get(&mac) {
-                        match manager.as_ref() {
-                            BluetoothManager::AACP(manager) => {
-                                log::debug!("Renaming device {} to {}", mac, new_name);
-                                if let Err(e) = manager.send_rename_packet(&new_name).await {
-                                    log::error!("Failed to rename device {}: {}", mac, e);
-                                }
-                            }
-                            _ => {
-                                log::warn!("AACP not available for {}", mac);
-                            }
-                        }
-                    } else {
-                        log::warn!("No manager for device {}", mac);
-                    }
-                }
-                UICommand::Nothing(NothingCommand::SetNoiseCancellationMode(mac, mode)) => {
-                    if let Some(manager) = device_managers_clone.get(&mac) {
-                        match manager.as_ref() {
-                            BluetoothManager::ATT(manager) => {
-                                log::debug!("Setting noise cancellation mode for device {}: {:?}", mac, mode);
-                                if let Err(e) = manager.write(
-                                    ATTHandles::NothingEverything,
-                                    &[
-                                        0x55,
-                                        0x60, 0x01,
-                                        0x0F, 0xF0,
-                                        0x03, 0x00,
-                                        0x00, 0x01, // the 0x00 is an incremental counter, but it works without it
-                                        mode.to_byte(), 0x00,
-                                        0x00, 0x00 // these both bytes were something random, 0 works too
-                                    ]
-                                ).await {
-                                    log::error!("Failed to set noise cancellation mode for device {}: {}", mac, e);
-                                }
-                            }
-                            _ => {
-                                log::warn!("Nothing manager not available for {}", mac);
-                            }
-                        }
-                    } else {
-                        log::warn!("No manager for device {}", mac);
-                    }
-                }
-            }
-        }
-    });
 
     info!("Listening for Bluetooth connections via D-Bus...");
     loop {

@@ -1,12 +1,6 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use crate::bluetooth::aacp::AACPManager;
 use crate::bluetooth::att::ATTManager;
-
-pub enum BluetoothManager {
-    AACP(Arc<AACPManager>),
-    ATT(Arc<ATTManager>),
-}
 
 pub struct DeviceManagers {
     att: Option<Arc<ATTManager>>,
@@ -14,39 +8,32 @@ pub struct DeviceManagers {
 }
 
 impl DeviceManagers {
-    fn new() -> Self {
-        Self { att: None, aacp: None }
-    }
-
-    fn with_aacp(aacp: AACPManager) -> Self {
+    pub fn with_aacp(aacp: AACPManager) -> Self {
         Self { att: None, aacp: Some(Arc::new(aacp)) }
     }
 
-    fn with_att(att: ATTManager) -> Self {
+    pub fn with_att(att: ATTManager) -> Self {
         Self { att: Some(Arc::new(att)), aacp: None }
     }
-}
 
-pub struct BluetoothDevices {
-    devices: HashMap<String, DeviceManagers>,
-}
-
-impl BluetoothDevices {
-    fn new() -> Self {
-        Self { devices: HashMap::new() }
+    // keeping the att for airpods optional as it requires changes in system bluez config
+    pub fn with_both(aacp: AACPManager, att: ATTManager) -> Self {
+        Self { att: Some(Arc::new(att)), aacp: Some(Arc::new(aacp)) }
     }
 
-    fn add_aacp(&mut self, mac: String, manager: AACPManager) {
-        self.devices
-            .entry(mac)
-            .or_insert_with(DeviceManagers::new)
-            .aacp = Some(Arc::new(manager));
+    pub fn set_aacp(&mut self, manager: AACPManager) {
+        self.aacp = Some(Arc::new(manager));
     }
 
-    fn add_att(&mut self, mac: String, manager: ATTManager) {
-        self.devices
-            .entry(mac)
-            .or_insert_with(DeviceManagers::new)
-            .att = Some(Arc::new(manager));
+    pub fn set_att(&mut self, manager: ATTManager) {
+        self.att = Some(Arc::new(manager));
+    }
+
+    pub fn get_aacp(&self) -> Option<Arc<AACPManager>> {
+        self.aacp.clone()
+    }
+
+    pub fn get_att(&self) -> Option<Arc<ATTManager>> {
+        self.att.clone()
     }
 }
