@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use iced::{Background, Border, Length, Theme};
-use iced::widget::{container, text, column, row, Space, combo_box};
+use iced::widget::{container, text, column, row, Space};
 use crate::bluetooth::att::ATTManager;
 use crate::devices::enums::{DeviceData, DeviceInformation, NothingState};
 use crate::ui::window::Message;

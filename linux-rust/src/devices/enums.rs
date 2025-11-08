@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use iced::widget::{combo_box, ComboBox};
 use serde::{Deserialize, Serialize};
 use crate::devices::airpods::AirPodsInformation;
 use crate::devices::nothing::NothingInformation;
@@ -53,8 +54,50 @@ impl Display for DeviceState {
 #[derive(Clone, Debug)]
 pub struct AirPodsState {
     pub device_name: String,
+    pub noise_control_mode: AirPodsNoiseControlMode,
+    pub noise_control_state: combo_box::State<AirPodsNoiseControlMode>,
     pub conversation_awareness_enabled: bool,
     pub personalized_volume_enabled: bool,
+    pub allow_off_mode: bool
+}
+
+#[derive(Clone, Debug)]
+pub enum AirPodsNoiseControlMode {
+    Off,
+    NoiseCancellation,
+    Transparency,
+    Adaptive
+}
+
+impl Display for AirPodsNoiseControlMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AirPodsNoiseControlMode::Off => write!(f, "Off"),
+            AirPodsNoiseControlMode::NoiseCancellation => write!(f, "Noise Cancellation"),
+            AirPodsNoiseControlMode::Transparency => write!(f, "Transparency"),
+            AirPodsNoiseControlMode::Adaptive => write!(f, "Adaptive"),
+        }
+    }
+}
+
+impl AirPodsNoiseControlMode {
+    pub fn from_byte(value: &u8) -> Self {
+        match value {
+            0x01 => AirPodsNoiseControlMode::Off,
+            0x02 => AirPodsNoiseControlMode::NoiseCancellation,
+            0x03 => AirPodsNoiseControlMode::Transparency,
+            0x04 => AirPodsNoiseControlMode::Adaptive,
+            _ => AirPodsNoiseControlMode::Off,
+        }
+    }
+    pub fn to_byte(&self) -> u8 {
+        match self {
+            AirPodsNoiseControlMode::Off => 0x01,
+            AirPodsNoiseControlMode::NoiseCancellation => 0x02,
+            AirPodsNoiseControlMode::Transparency => 0x03,
+            AirPodsNoiseControlMode::Adaptive => 0x04,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

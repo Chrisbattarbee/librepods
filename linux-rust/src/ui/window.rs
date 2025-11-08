@@ -12,7 +12,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::{Mutex, RwLock};
 use crate::bluetooth::aacp::{AACPEvent, ControlCommandIdentifiers};
 use crate::bluetooth::managers::DeviceManagers;
-use crate::devices::enums::{AirPodsState, DeviceData, DeviceState, DeviceType, NothingAncMode, NothingState};
+use crate::devices::enums::{AirPodsNoiseControlMode, AirPodsState, DeviceData, DeviceState, DeviceType, NothingAncMode, NothingState};
 use crate::ui::messages::BluetoothUIMessage;
 use crate::utils::{get_devices_path, get_app_settings_path, MyTheme};
 use crate::ui::airpods::airpods_view;
@@ -301,12 +301,39 @@ impl App {
                                 };
                                 self.device_states.insert(mac.clone(), DeviceState::AirPods(AirPodsState {
                                     device_name,
+                                    noise_control_mode: state.control_command_status_list.iter().find_map(|status| {
+                                        if status.identifier == ControlCommandIdentifiers::ListeningMode {
+                                            status.value.get(0).map(|b| AirPodsNoiseControlMode::from_byte(b))
+                                        } else {
+                                            None
+                                        }
+                                    }).unwrap_or(AirPodsNoiseControlMode::Transparency),
+                                    noise_control_state: combo_box::State::new(
+                                        {
+                                            let mut modes = vec![
+                                                AirPodsNoiseControlMode::Transparency,
+                                                AirPodsNoiseControlMode::NoiseCancellation,
+                                                AirPodsNoiseControlMode::Adaptive
+                                            ];
+                                            if state.control_command_status_list.iter().any(|status| {
+                                                status.identifier == ControlCommandIdentifiers::AllowOffOption &&
+                                                matches!(status.value.as_slice(), [0x01])
+                                            }) {
+                                                modes.insert(0, AirPodsNoiseControlMode::Off);
+                                            }
+                                            modes
+                                        }
+                                    ),
                                     conversation_awareness_enabled: state.control_command_status_list.iter().any(|status| {
                                         status.identifier == ControlCommandIdentifiers::ConversationDetectConfig &&
                                         matches!(status.value.as_slice(), [0x01])
                                     }),
                                     personalized_volume_enabled: state.control_command_status_list.iter().any(|status| {
                                         status.identifier == ControlCommandIdentifiers::AdaptiveVolumeConfig &&
+                                        matches!(status.value.as_slice(), [0x01])
+                                    }),
+                                    allow_off_mode: state.control_command_status_list.iter().any(|status| {
+                                        status.identifier == ControlCommandIdentifiers::AllowOffOption &&
                                         matches!(status.value.as_slice(), [0x01])
                                     }),
                                 }));
@@ -346,6 +373,12 @@ impl App {
                         match event {
                             AACPEvent::ControlCommand(status) => {
                                 match status.identifier {
+                                    ControlCommandIdentifiers::ListeningMode => {
+                                        let mode = status.value.get(0).map(|b| AirPodsNoiseControlMode::from_byte(b)).unwrap_or(AirPodsNoiseControlMode::Transparency);
+                                        if let Some(DeviceState::AirPods(state)) = self.device_states.get_mut(&mac) {
+                                            state.noise_control_mode = mode;
+                                        }
+                                    }
                                     ControlCommandIdentifiers::ConversationDetectConfig => {
                                         let is_enabled = match status.value.as_slice() {
                                             [0x01] => true,
@@ -370,6 +403,32 @@ impl App {
                                         };
                                         if let Some(DeviceState::AirPods(state)) = self.device_states.get_mut(&mac) {
                                             state.personalized_volume_enabled = is_enabled;
+                                        }
+                                    }
+                                    ControlCommandIdentifiers::AllowOffOption => {
+                                        let is_enabled = match status.value.as_slice() {
+                                            [0x01] => true,
+                                            [0x02] => false,
+                                            _ => {
+                                                error!("Unknown Allow Off Option value: {:?}", status.value);
+                                                false
+                                            }
+                                        };
+                                        if let Some(DeviceState::AirPods(state)) = self.device_states.get_mut(&mac) {
+                                            state.allow_off_mode = is_enabled;
+                                            state.noise_control_state = combo_box::State::new(
+                                                {
+                                                    let mut modes = vec![
+                                                        AirPodsNoiseControlMode::Transparency,
+                                                        AirPodsNoiseControlMode::NoiseCancellation,
+                                                        AirPodsNoiseControlMode::Adaptive
+                                                    ];
+                                                    if is_enabled {
+                                                        modes.insert(0, AirPodsNoiseControlMode::Off);
+                                                    }
+                                                    modes
+                                                }
+                                            );
                                         }
                                     }
                                     _ => {
@@ -449,7 +508,39 @@ impl App {
                 Task::none()
             }
             Message::StateChanged(mac, state) => {
-                self.device_states.insert(mac, state);
+                self.device_states.insert(mac.clone(), state);
+                // if airpods, update the noise control state combo box based on allow off mode
+                let type_ = {
+                    let devices_json = std::fs::read_to_string(get_devices_path()).unwrap_or_else(|e| {
+                        error!("Failed to read devices file: {}", e);
+                        "{}".to_string()
+                    });
+                    let devices_list: HashMap<String, DeviceData> = serde_json::from_str(&devices_json).unwrap_or_else(|e| {
+                        error!("Deserialization failed: {}", e);
+                        HashMap::new()
+                    });
+                    devices_list.get(&mac).map(|d| d.type_.clone())
+                };
+                match type_ {
+                    Some(DeviceType::AirPods) => {
+                        if let Some(DeviceState::AirPods(state)) = self.device_states.get_mut(&mac) {
+                            state.noise_control_state = combo_box::State::new(
+                                {
+                                    let mut modes = vec![
+                                        AirPodsNoiseControlMode::Transparency,
+                                        AirPodsNoiseControlMode::NoiseCancellation,
+                                        AirPodsNoiseControlMode::Adaptive
+                                    ];
+                                    if state.allow_off_mode {
+                                        modes.insert(0, AirPodsNoiseControlMode::Off);
+                                    }
+                                    modes
+                                }
+                            );
+                        }
+                    }
+                    _ => {}
+                }
                 Task::none()
             }
         }
@@ -622,33 +713,34 @@ impl App {
                                 debug!("Rendering device view for {}: type={:?}, state={:?}", id, device_type, device_state);
                                 match device_type {
                                     Some(DeviceType::AirPods) => {
-                                        if let Some(DeviceState::AirPods(state)) = device_state {
-                                            if let Some(device_managers) = device_managers.get(id) {
-                                                if let Some(aacp_manager) = device_managers.get_aacp() {
-                                                    airpods_view(id, &devices_list, state, aacp_manager.clone())
-                                                } else {
-                                                    error!("No AACP manager found for AirPods device {}", id);
-                                                    container(
-                                                        text("No valid AACP manager found for this AirPods device").size(16)
-                                                    )
-                                                        .center_x(Length::Fill)
-                                                        .center_y(Length::Fill)
+                                        let view = device_state.as_ref().and_then(|state| {
+                                            match state {
+                                                DeviceState::AirPods(state) => {
+                                                    device_managers.get(id).and_then(|managers| {
+                                                        managers.get_aacp().and_then(|aacp_manager| {
+                                                            // managers.get_att().map(|att_manager| {
+                                                                Some(airpods_view(
+                                                                    id,
+                                                                    &devices_list,
+                                                                    state,
+                                                                    aacp_manager.clone()
+                                                                ),
+                                                                    // att_manager.clone(),
+                                                                )
+                                                            // })
+                                                        })
+                                                    })
                                                 }
-                                            } else {
-                                                error!("No manager found for AirPods device {}", id);
-                                                container(
-                                                    text("No manager found for this AirPods device").size(16)
-                                                )
-                                                    .center_x(Length::Fill)
-                                                    .center_y(Length::Fill)
+                                                _ => None,
                                             }
-                                        } else {
+                                        }).unwrap_or_else(|| {
                                             container(
-                                                text("No state available for this AirPods device").size(16)
+                                                text("Required managers or state not available for this AirPods device").size(16)
                                             )
                                                 .center_x(Length::Fill)
                                                 .center_y(Length::Fill)
-                                        }
+                                        });
+                                        view
                                     }
                                     Some(DeviceType::Nothing) => {
                                         if let Some(DeviceState::Nothing(state)) = device_state {
@@ -725,7 +817,7 @@ impl App {
                                                     border: Border {
                                                         width: 1.0,
                                                         color: theme.palette().text,
-                                                        radius: Radius::from(8.0)
+                                                        radius: Radius::from(4.0)
                                                     },
                                                     text_color: theme.palette().text,
                                                     selected_text_color: theme.palette().text,

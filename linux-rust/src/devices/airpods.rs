@@ -1,6 +1,6 @@
 use crate::bluetooth::aacp::{AACPManager, ProximityKeyType, AACPEvent, AirPodsLEKeys};
 use crate::bluetooth::aacp::ControlCommandIdentifiers;
-// use crate::bluetooth::att::ATTManager;
+use crate::bluetooth::att::ATTManager;
 use crate::media_controller::MediaController;
 use bluer::Address;
 use log::{debug, info, error};
