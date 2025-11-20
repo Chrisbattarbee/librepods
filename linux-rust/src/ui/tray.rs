@@ -6,6 +6,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::bluetooth::aacp::ControlCommandIdentifiers;
 use crate::ui::messages::BluetoothUIMessage;
+use crate::utils::get_app_settings_path;
 
 #[derive(Debug)]
 pub(crate) struct MyTray {
@@ -57,7 +58,15 @@ impl ksni::Tray for MyTray {
         };
         let any_bud_charging = matches!(self.battery_l_status, Some(crate::bluetooth::aacp::BatteryStatus::Charging))
             || matches!(self.battery_r_status, Some(crate::bluetooth::aacp::BatteryStatus::Charging));
-        let icon = generate_icon(&text, false, any_bud_charging);
+        let app_settings_path = get_app_settings_path();
+        let settings = std::fs::read_to_string(&app_settings_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+        let text_mode = settings.clone()
+            .and_then(|v| v.get("tray_text_mode").cloned())
+            .and_then(|ttm| serde_json::from_value(ttm).ok())
+            .unwrap_or(false);
+        let icon = generate_icon(&text, text_mode, any_bud_charging);
         vec![icon]
     }
     fn tool_tip(&self) -> ToolTip {

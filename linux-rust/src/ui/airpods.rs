@@ -24,6 +24,7 @@ pub fn airpods_view<'a>(
 ) -> iced::widget::Container<'a, Message> {
     let mac = mac.to_string();
     // order: name, noise control, press and hold config, call controls (not sure if why it might be needed, adding it just in case), audio (personalized volume, conversational awareness, adaptive audio slider), connection settings, microphone, head gestures (not adding this), off listening mode, device information
+
     let aacp_manager_for_rename = aacp_manager.clone();
     let rename_input = container(
         row![
@@ -221,14 +222,13 @@ pub fn airpods_view<'a>(
                         column![
                             text("Personalized Volume").size(16),
                             text("Adjusts the volume in response to your environment.").size(12).style(
-                            |theme: &Theme| {
-                                let mut style = text::Style::default();
-                                style.color = Some(theme.palette().text.scale_alpha(0.7));
-                                style
-                            }
-                        )
-                        ],
-                        Space::with_width(Length::Fill),
+                                |theme: &Theme| {
+                                    let mut style = text::Style::default();
+                                    style.color = Some(theme.palette().text.scale_alpha(0.7));
+                                    style
+                                }
+                            ).width(Length::Fill),
+                        ].width(Length::Fill),
                         toggler(state.personalized_volume_enabled)
                             .on_toggle(
                             {
@@ -255,6 +255,7 @@ pub fn airpods_view<'a>(
                         .size(20)
                     ]
                     .align_y(Center)
+                    .spacing(8)
                 },
                 Rule::horizontal(8).style(
                     |theme: &Theme| {
@@ -272,14 +273,13 @@ pub fn airpods_view<'a>(
                         column![
                             text("Conversation Awareness").size(16),
                             text("Lowers the volume of your audio when it detects that you are speaking.").size(12).style(
-                            |theme: &Theme| {
-                                let mut style = text::Style::default();
-                                style.color = Some(theme.palette().text.scale_alpha(0.7));
-                                style
-                            }
-                        )
-                        ],
-                        Space::with_width(Length::Fill),
+                                |theme: &Theme| {
+                                    let mut style = text::Style::default();
+                                    style.color = Some(theme.palette().text.scale_alpha(0.7));
+                                    style
+                                }
+                            ).width(Length::Fill),
+                        ].width(Length::Fill),
                         toggler(state.conversation_awareness_enabled)
                             .on_toggle(move |is_enabled| {
                                 let aacp_manager = aacp_manager_conv_detect.clone();
@@ -299,6 +299,7 @@ pub fn airpods_view<'a>(
                         .size(20)
                     ]
                     .align_y(Center)
+                    .spacing(8)
                 }
             ]
                 .spacing(4)
@@ -328,15 +329,14 @@ pub fn airpods_view<'a>(
         container(row![
             column![
                 text("Off Listening Mode").size(16),
-                text("When this is on, AIrPods listening modes will include an Off option. Loud sound levels are not reduced when listening mode is set to Off.").size(12).style(
+                text("When this is on, AirPods listening modes will include an Off option. Loud sound levels are not reduced when listening mode is set to Off.").size(12).style(
                     |theme: &Theme| {
                         let mut style = text::Style::default();
                         style.color = Some(theme.palette().text.scale_alpha(0.7));
                         style
                     }
-                )
-            ],
-            Space::with_width(Length::Fill),
+                ).width(Length::Fill)
+            ].width(Length::Fill),
             toggler(state.allow_off_mode)
                 .on_toggle(move |is_enabled| {
                     let aacp_manager = aacp_manager_olm.clone();
@@ -356,6 +356,7 @@ pub fn airpods_view<'a>(
             .size(20)
         ]
             .align_y(Center)
+            .spacing(8)
         )
             .padding(Padding{
                 top: 5.0,

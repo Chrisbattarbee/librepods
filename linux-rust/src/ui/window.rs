@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use iced::widget::button::Style;
-use iced::widget::{button, column, container, pane_grid, text, Space, combo_box, row, text_input, scrollable, vertical_rule, rule};
-use iced::{daemon, window, Background, Border, Center, Color, Element, Length, Size, Subscription, Task, Theme};
+use iced::widget::{button, column, container, pane_grid, text, Space, combo_box, row, text_input, scrollable, vertical_rule, rule, toggler};
+use iced::{daemon, window, Background, Border, Center, Color, Element, Font, Length, Padding, Size, Subscription, Task, Theme};
 use std::sync::Arc;
 use bluer::{Address, Session};
 use iced::border::Radius;
@@ -10,7 +10,7 @@ use iced::widget::rule::FillMode;
 use log::{debug, error};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::{Mutex, RwLock};
-use crate::bluetooth::aacp::{AACPEvent, ControlCommandIdentifiers};
+use crate::bluetooth::aacp::{AACPEvent, ControlCommandIdentifiers, BatteryComponent, BatteryStatus};
 use crate::bluetooth::managers::DeviceManagers;
 use crate::devices::enums::{AirPodsNoiseControlMode, AirPodsState, DeviceData, DeviceState, DeviceType, NothingAncMode, NothingState};
 use crate::ui::messages::BluetoothUIMessage;
@@ -26,6 +26,8 @@ pub fn start_ui(
     daemon(App::title, App::update, App::view)
         .subscription(App::subscription)
         .theme(App::theme)
+        .font(include_bytes!("../../assets/font/sf_pro.otf").as_slice())
+        .default_font(Font::with_name("SF Pro Text"))
         .run_with(move || App::new(ui_rx, start_minimized, device_managers))
 }
 
@@ -43,6 +45,7 @@ pub struct App {
     pending_add_device: Option<(String, Address)>,
     device_type_state: combo_box::State<DeviceType>,
     selected_device_type: Option<DeviceType>,
+    tray_text_mode: bool
 }
 
 pub struct BluetoothState {
@@ -73,6 +76,7 @@ pub enum Message {
     ConfirmAddDevice,
     CancelAddDevice,
     StateChanged(String, DeviceState),
+    TrayTextModeChanged(bool) // yes, I know I should add all settings to a struct, but I'm lazy
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -116,12 +120,17 @@ impl App {
         };
 
         let app_settings_path = get_app_settings_path();
-        let selected_theme = std::fs::read_to_string(&app_settings_path)
+        let settings = std::fs::read_to_string(&app_settings_path)
             .ok()
-            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+        let selected_theme = settings.clone()
             .and_then(|v| v.get("theme").cloned())
             .and_then(|t| serde_json::from_value(t).ok())
             .unwrap_or(MyTheme::Dark);
+        let tray_text_mode = settings.clone()
+            .and_then(|v| v.get("tray_text_mode").cloned())
+            .and_then(|ttm| serde_json::from_value(ttm).ok())
+            .unwrap_or(false);
 
         let bluetooth_state = BluetoothState::new();
 
@@ -131,6 +140,7 @@ impl App {
         // let device_states = HashMap::from([
         //     ("28:2D:7F:C2:05:5B".to_string(), dummy_device_state),
         // ]);
+
 
         let device_states = HashMap::new();
         (
@@ -172,7 +182,8 @@ impl App {
                     DeviceType::Nothing
                 ]),
                 selected_device_type: None,
-                device_managers
+                device_managers,
+                tray_text_mode
             },
             Task::batch(vec![open_task, wait_task])
         )
@@ -205,7 +216,7 @@ impl App {
             Message::ThemeSelected(theme) => {
                 self.selected_theme = theme;
                 let app_settings_path = get_app_settings_path();
-                let settings = serde_json::json!({"theme": self.selected_theme});
+                let settings = serde_json::json!({"theme": self.selected_theme, "tray_text_mode": self.tray_text_mode});
                 debug!("Writing settings to {}: {}", app_settings_path.to_str().unwrap() , settings);
                 std::fs::write(app_settings_path, settings.to_string()).ok();
                 Task::none()
@@ -301,6 +312,7 @@ impl App {
                                 };
                                 self.device_states.insert(mac.clone(), DeviceState::AirPods(AirPodsState {
                                     device_name,
+                                    battery: state.battery_info.clone(),
                                     noise_control_mode: state.control_command_status_list.iter().find_map(|status| {
                                         if status.identifier == ControlCommandIdentifiers::ListeningMode {
                                             status.value.get(0).map(|b| AirPodsNoiseControlMode::from_byte(b))
@@ -444,6 +456,12 @@ impl App {
                                     }
                                 }
                             }
+                            AACPEvent::BatteryInfo(battery_info) => {
+                                if let Some(DeviceState::AirPods(state)) = self.device_states.get_mut(&mac) {
+                                    state.battery = battery_info;
+                                    debug!("Updated battery info for {}: {:?}", mac, state.battery);
+                                }
+                            }
                             _ => {}
                         }
                         Task::batch(vec![
@@ -554,6 +572,14 @@ impl App {
                 }
                 Task::none()
             }
+            Message::TrayTextModeChanged(is_enabled) => {
+                self.tray_text_mode = is_enabled;
+                let app_settings_path = get_app_settings_path();
+                let settings = serde_json::json!({"theme": self.selected_theme, "tray_text_mode": self.tray_text_mode});
+                debug!("Writing settings to {}: {}", app_settings_path.to_str().unwrap() , settings);
+                std::fs::write(app_settings_path, settings.to_string()).ok();
+                Task::none()
+            }
         }
     }
 
@@ -569,18 +595,44 @@ impl App {
         let pane_grid = pane_grid::PaneGrid::new(&self.panes, |_pane_id, pane, _is_maximized| {
             match pane {
                 Pane::Sidebar => {
-                    let create_tab_button = |tab: Tab, label: &str, description: &str, connected: bool| -> Element<'_, Message> {
-                        let label = label.to_string();
+                    let create_tab_button = |tab: Tab, label: &str, mac_addr: &str, connected: bool| -> Element<'_, Message> {
+                        let label = label.to_string() + if connected { " 􀉣" } else { "" };
                         let is_selected = self.selected_tab == tab;
                         let col = column![
                             text(label).size(16),
-                            text(
+                            text({
                                 if connected {
-                                    format!("Connected - {}", description)
+                                    let mac = match tab {
+                                        Tab::Device(ref mac) => mac.as_str(),
+                                        _ => "",
+                                    };
+
+                                    match self.device_states.get(mac) {
+                                        Some(DeviceState::AirPods(state)) => {
+                                            let b = &state.battery;
+                                            let left  = b.iter().find(|x| x.component == BatteryComponent::Left)
+                                                .map(|x| x.level).unwrap_or_default();
+                                            let right = b.iter().find(|x| x.component == BatteryComponent::Right)
+                                                .map(|x| x.level).unwrap_or_default();
+                                            let case  = b.iter().find(|x| x.component == BatteryComponent::Case)
+                                                .map(|x| x.level).unwrap_or_default();
+                                            let left_charging = b.iter().find(|x| x.component == BatteryComponent::Left)
+                                                .map(|x| x.status == BatteryStatus::Charging).unwrap_or(false);
+                                            let right_charging = b.iter().find(|x| x.component == BatteryComponent::Right)
+                                                .map(|x| x.status == BatteryStatus::Charging).unwrap_or(false);
+                                            let case_charging = b.iter().find(|x| x.component == BatteryComponent::Case)
+                                                .map(|x| x.status == BatteryStatus::Charging).unwrap_or(false);
+                                            format!(
+                                                "\u{1018E5} {}%{} \u{1018E8} {}%{} \u{100E6C} {}%{}",
+                                                left, if left_charging {"\u{1002E6}"} else {""}, right, if right_charging {"\u{1002E6}"} else {""}, case, if case_charging {"\u{1002E6}"} else {""}
+                                            )
+                                        }
+                                        _ => "Connected".to_string(),
+                                    }
                                 } else {
-                                    format!("{}", description)
+                                    mac_addr.to_string()
                                 }
-                            ).size(12)
+                            }).size(12)
                         ];
                         let content = container(col)
                             .padding(8);
@@ -791,12 +843,65 @@ impl App {
                             }
                         }
                         Tab::Settings => {
-                            container(
-                                column![
-                                    text("Settings").size(40),
-                                    Space::with_height(Length::from(20)),
+                            let tray_text_mode_toggle = container(
+                                row![
+                                    column![
+                                        text("Use text in tray").size(16),
+                                        text("Use text for battery status in tray instead of a progress bar.").size(12).style(
+                                            |theme: &Theme| {
+                                                let mut style = text::Style::default();
+                                                style.color = Some(theme.palette().text.scale_alpha(0.7));
+                                                style
+                                            }
+                                        ).width(Length::Fill)
+                                    ].width(Length::Fill),
+                                    toggler(self.tray_text_mode)
+                                        .on_toggle(move |is_enabled| {
+                                            Message::TrayTextModeChanged(is_enabled)
+                                        })
+                                    .spacing(0)
+                                    .size(20)
+                                    ]
+                                        .align_y(Center)
+                                        .spacing(12)
+                                    )
+                                        .padding(Padding{
+                                            top: 5.0,
+                                            bottom: 5.0,
+                                            left: 18.0,
+                                            right: 18.0,
+                                        })
+                                        .style(
+                                            |theme: &Theme| {
+                                                let mut style = container::Style::default();
+                                                style.background = Some(Background::Color(theme.palette().primary.scale_alpha(0.1)));
+                                                let mut border = Border::default();
+                                                border.color = theme.palette().primary.scale_alpha(0.5);
+                                                style.border = border.rounded(16);
+                                                style
+                                            }
+                                        )
+                                    .align_y(Center);
+
+                            let appearance_settings_col = column![
+                                container(
+                                    text("Appearance").size(20).style(
+                                        |theme: &Theme| {
+                                            let mut style = text::Style::default();
+                                            style.color = Some(theme.palette().primary);
+                                            style
+                                        }
+                                    )
+                                )
+                                .padding(Padding{
+                                    top: 0.0,
+                                    bottom: 0.0,
+                                    left: 18.0,
+                                    right: 18.0,
+                                }),
+                                container(
                                     row![
-                                        text("Theme:")
+                                        text("Theme")
                                             .size(16),
                                         Space::with_width(Length::Fill),
                                         combo_box(
@@ -808,23 +913,23 @@ impl App {
                                         .input_style(
                                             |theme: &Theme, _status| {
                                                 text_input::Style {
-                                                    background: Background::Color(Color::TRANSPARENT),
+                                                    background: Background::Color(theme.palette().primary.scale_alpha(0.2)),
                                                     border: Border {
                                                         width: 1.0,
-                                                        color: theme.palette().text,
-                                                        radius: Radius::from(8.0),
+                                                        color: theme.palette().text.scale_alpha(0.3),
+                                                        radius: Radius::from(4.0)
                                                     },
                                                     icon: Default::default(),
-                                                    placeholder: theme.palette().text.scale_alpha(0.5),
+                                                    placeholder: theme.palette().text,
                                                     value: theme.palette().text,
-                                                    selection: theme.palette().primary
+                                                    selection: Default::default(),
                                                 }
                                             }
                                         )
                                         .menu_style(
                                             |theme: &Theme| {
                                                 menu::Style {
-                                                    background: Background::Color(Color::TRANSPARENT),
+                                                    background: Background::Color(theme.palette().background),
                                                     border: Border {
                                                         width: 1.0,
                                                         color: theme.palette().text,
@@ -836,9 +941,40 @@ impl App {
                                                 }
                                             }
                                         )
-                                        .width(Length::from(350))
+                                        .padding(Padding{
+                                            top: 5.0,
+                                            bottom: 5.0,
+                                            left: 10.0,
+                                            right: 10.0,
+                                        })
+                                        .width(Length::from(200))
                                     ]
                                     .align_y(Center)
+                                )
+                                    .padding(Padding{
+                                        top: 5.0,
+                                        bottom: 5.0,
+                                        left: 18.0,
+                                        right: 18.0,
+                                    })
+                                    .style(
+                                        |theme: &Theme| {
+                                            let mut style = container::Style::default();
+                                            style.background = Some(Background::Color(theme.palette().primary.scale_alpha(0.1)));
+                                            let mut border = Border::default();
+                                            border.color = theme.palette().primary.scale_alpha(0.5);
+                                            style.border = border.rounded(16);
+                                            style
+                                        }
+                                    )
+                                ]
+                                .spacing(12);
+
+                            container(
+                                column![
+                                    appearance_settings_col,
+                                    Space::with_height(Length::from(20)),
+                                    tray_text_mode_toggle
                                 ]
                             )
                                 .padding(20)
@@ -862,7 +998,6 @@ impl App {
                                                     ].into(),
                                                     Space::with_width(Length::Fill).into(),
                                                 ];
-                                                // Only show "Add" button if this device is not the pending one
                                                 if !matches!(&self.pending_add_device, Some((_, addr)) if addr == &device.1) {
                                                     row_elements.push(
                                                         button(

@@ -28,19 +28,33 @@ use crate::utils::get_devices_path;
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long)]
+    #[arg(long, short='d', help="Enable debug logging")]
     debug: bool,
-    #[arg(long)]
+    #[arg(long, help="Disable system tray, useful if your environment doesn't support AppIndicator or StatusNotifier")]
     no_tray: bool,
-    #[arg(long)]
+    #[arg(long, help="Start the application minimized to tray")]
     start_minimized: bool,
+    #[arg(long, help="Enable Bluetooth LE debug logging. Only use when absolutely necessary; this produces a lot of logs.")]
+    le_debug: bool,
+    #[arg(long, short='v', help="Show application version and exit")]
+    version: bool
 }
 
 fn main() -> iced::Result {
     let args = Args::parse();
+
+    if args.version {
+        println!("You are running LibrePods version {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     let log_level = if args.debug { "debug" } else { "info" };
+    let wayland_display = env::var("WAYLAND_DISPLAY").is_ok();
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", log_level.to_owned() + ",winit=warn,tracing=warn,,iced_wgpu=warn,wgpu_hal=warn,wgpu_core=warn,librepods_rust::bluetooth::le=warn,cosmic_text=warn,naga=warn,iced_winit=warn") };
+        if wayland_display {
+            unsafe { env::set_var("WGPU_BACKEND", "gl") };
+        }
+        unsafe { env::set_var("RUST_LOG", log_level.to_owned() + &format!(",winit=warn,tracing=warn,iced_wgpu=warn,wgpu_hal=warn,wgpu_core=warn,cosmic_text=warn,naga=warn,iced_winit=warn,librepods_rust::bluetooth::le={}", if args.le_debug { "debug" } else { "warn" })) };
     }
     env_logger::init();
 

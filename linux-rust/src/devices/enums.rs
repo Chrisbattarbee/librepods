@@ -1,6 +1,7 @@
 use std::fmt::Display;
-use iced::widget::{combo_box, ComboBox};
+use iced::widget::combo_box;
 use serde::{Deserialize, Serialize};
+use crate::bluetooth::aacp::BatteryInfo;
 use crate::devices::airpods::AirPodsInformation;
 use crate::devices::nothing::NothingInformation;
 
@@ -58,7 +59,8 @@ pub struct AirPodsState {
     pub noise_control_state: combo_box::State<AirPodsNoiseControlMode>,
     pub conversation_awareness_enabled: bool,
     pub personalized_volume_enabled: bool,
-    pub allow_off_mode: bool
+    pub allow_off_mode: bool,
+    pub battery: Vec<BatteryInfo>
 }
 
 #[derive(Clone, Debug)]
