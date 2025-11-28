@@ -23,9 +23,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
 
-import os
-sys.path.insert(0, os.path.dirname(__file__))
-
 handler = logging.StreamHandler()
 class ColorFormatter(logging.Formatter):
     COLORS = {
