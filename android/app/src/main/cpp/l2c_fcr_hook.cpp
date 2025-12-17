@@ -132,7 +132,9 @@ static void (*original_l2cu_send_peer_info_req)(tL2C_LCB* p_lcb, uint16_t info_t
 static tBTA_STATUS (*original_BTA_DmSetLocalDiRecord)(tSDP_DI_RECORD* p_device_info, uint32_t* p_handle) = nullptr;
 
 uint8_t fake_l2c_fcr_chk_chan_modes(void* p_ccb) {
-    LOGI("l2c_fcr_chk_chan_modes hooked, returning true.");
+    LOGI("l2c_fcr_chk_chan_modes hooked, calling original function.");
+    uint8_t result = original_l2c_fcr_chk_chan_modes(p_ccb);
+    LOGI("Original l2c_fcr_chk_chan_modes returned: %d; returning 1.", result);
     return 1;
 }
 
