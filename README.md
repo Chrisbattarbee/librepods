@@ -1,3 +1,6 @@
+>[!IMPORTANT]
+Development paused due to lack of time until 17th May 2025 (JEE Advanced). PRs and issues might not be responded to until then.
+
 ![LibrePods Banner](./imgs/banner.png)
 
 ## What is LibrePods?
@@ -46,8 +49,8 @@ new version in development ([#241](https://github.com/kavishdevar/librepods/pull
 
 #### Screenshots
 
-|                                                                                        |                                                   |                                                                             |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
+|                                                                                         |                                                    |                                                                              |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------- |
 | ![Settings 1](./android/imgs/settings-1.png)                                            | ![Settings 2](./android/imgs/settings-2.png)       | ![Debug Screen](./android/imgs/debug.png)                                    |
 | ![Battery Notification and QS Tile for NC Mode](./android/imgs/notification-and-qs.png) | ![Popup](./android/imgs/popup.png)                 | ![Head Tracking and Gestures](./android/imgs/head-tracking-and-gestures.png) |
 | ![Long Press Configuration](./android/imgs/long-press.png)                              | ![Widget](./android/imgs/widget.png)               | ![Customizations 1](./android/imgs/customizations-1.png)                     |
