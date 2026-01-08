@@ -158,6 +158,7 @@ impl MediaController {
                 info!("already connected locally, hijacking connection by asking AirPods");
 
                 let connected_devices = aacp_state.connected_devices.clone();
+                drop(aacp_state); // Release lock before calling methods that also lock state
                 for device in connected_devices {
                     if device.mac != local_mac {
                         if let Err(e) = aacp_manager
