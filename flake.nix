@@ -77,7 +77,7 @@
 
           # RUST_BACKTRACE = "1";
           # Use all available cores
-          CARGO_BUILD_JOBS = "auto";
+          CARGO_BUILD_JOBS = "24";
         };
 
         librepods = craneLib.buildPackage (
