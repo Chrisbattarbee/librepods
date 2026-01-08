@@ -4,6 +4,127 @@ use aes::cipher::{BlockEncrypt, KeyInit};
 use iced::Theme;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::process::Command;
+
+const BLUEZ_CONFIG_PATH: &str = "/etc/bluetooth/main.conf";
+const APPLE_DEVICE_ID: &str = "bluetooth:004C:0000:0000";
+
+/// Status of the BlueZ DeviceID configuration for seamless switching
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeviceIdStatus {
+    /// Correctly configured with Apple's vendor ID
+    Configured,
+    /// DeviceID line not present in config
+    NotConfigured,
+    /// Different DeviceID value is configured
+    WrongValue(String),
+    /// BlueZ config file not found
+    FileNotFound,
+    /// Error reading or parsing the config file
+    ParseError(String),
+}
+
+impl std::fmt::Display for DeviceIdStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviceIdStatus::Configured => write!(f, "Configured"),
+            DeviceIdStatus::NotConfigured => write!(f, "Not configured"),
+            DeviceIdStatus::WrongValue(v) => write!(f, "Wrong value: {}", v),
+            DeviceIdStatus::FileNotFound => write!(f, "Config file not found"),
+            DeviceIdStatus::ParseError(e) => write!(f, "Error: {}", e),
+        }
+    }
+}
+
+/// Check the current DeviceID configuration in BlueZ
+pub fn check_device_id_status() -> DeviceIdStatus {
+    let config_path = std::path::Path::new(BLUEZ_CONFIG_PATH);
+
+    if !config_path.exists() {
+        return DeviceIdStatus::FileNotFound;
+    }
+
+    let content = match std::fs::read_to_string(config_path) {
+        Ok(c) => c,
+        Err(e) => return DeviceIdStatus::ParseError(e.to_string()),
+    };
+
+    // Look for DeviceID line in the config
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("DeviceID") && trimmed.contains('=') {
+            // Parse the value after '='
+            if let Some(value) = trimmed.split('=').nth(1) {
+                let value = value.trim();
+                if value.eq_ignore_ascii_case(APPLE_DEVICE_ID) {
+                    return DeviceIdStatus::Configured;
+                } else {
+                    return DeviceIdStatus::WrongValue(value.to_string());
+                }
+            }
+        }
+    }
+
+    DeviceIdStatus::NotConfigured
+}
+
+/// Configure the DeviceID in BlueZ config using pkexec for privilege escalation
+/// Returns Ok(()) on success, Err(message) on failure
+pub fn configure_device_id() -> Result<(), String> {
+    // Script to:
+    // 1. Backup the config file
+    // 2. Remove any existing DeviceID line
+    // 3. Add DeviceID under [General] section (or create section if needed)
+    let script = format!(
+        r#"
+        set -e
+        CONFIG="{config_path}"
+        BACKUP="${{CONFIG}}.bak.$(date +%Y%m%d%H%M%S)"
+
+        # Backup existing config
+        if [ -f "$CONFIG" ]; then
+            cp "$CONFIG" "$BACKUP"
+        fi
+
+        # Check if file exists, create with [General] section if not
+        if [ ! -f "$CONFIG" ]; then
+            echo "[General]" > "$CONFIG"
+            echo "DeviceID = {device_id}" >> "$CONFIG"
+            exit 0
+        fi
+
+        # Remove any existing DeviceID line
+        sed -i '/^[[:space:]]*DeviceID[[:space:]]*=/d' "$CONFIG"
+
+        # Check if [General] section exists
+        if grep -q '^\[General\]' "$CONFIG"; then
+            # Add DeviceID after [General] line
+            sed -i '/^\[General\]/a DeviceID = {device_id}' "$CONFIG"
+        else
+            # Add [General] section at the beginning with DeviceID
+            sed -i '1i [General]\nDeviceID = {device_id}\n' "$CONFIG"
+        fi
+        "#,
+        config_path = BLUEZ_CONFIG_PATH,
+        device_id = APPLE_DEVICE_ID
+    );
+
+    let output = Command::new("pkexec")
+        .args(["sh", "-c", &script])
+        .output()
+        .map_err(|e| format!("Failed to execute pkexec: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("dismissed") || stderr.contains("Not authorized") {
+            Err("Authorization cancelled".to_string())
+        } else {
+            Err(format!("Configuration failed: {}", stderr))
+        }
+    }
+}
 
 pub fn get_devices_path() -> PathBuf {
     let data_dir = std::env::var("XDG_DATA_HOME")

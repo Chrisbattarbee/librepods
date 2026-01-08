@@ -9,7 +9,7 @@ use crate::devices::enums::{
 use crate::ui::airpods::airpods_view;
 use crate::ui::messages::BluetoothUIMessage;
 use crate::ui::nothing::nothing_view;
-use crate::utils::{MyTheme, get_app_settings_path, get_devices_path};
+use crate::utils::{DeviceIdStatus, MyTheme, check_device_id_status, configure_device_id, get_app_settings_path, get_devices_path};
 use bluer::{Address, Session};
 use iced::border::Radius;
 use iced::overlay::menu;
@@ -57,6 +57,8 @@ pub struct App {
     device_type_state: combo_box::State<DeviceType>,
     selected_device_type: Option<DeviceType>,
     tray_text_mode: bool,
+    device_id_status: DeviceIdStatus,
+    device_id_configuring: bool,
 }
 
 pub struct BluetoothState {
@@ -88,6 +90,8 @@ pub enum Message {
     CancelAddDevice,
     StateChanged(String, DeviceState),
     TrayTextModeChanged(bool), // yes, I know I should add all settings to a struct, but I'm lazy
+    ConfigureDeviceId,
+    DeviceIdConfigResult(Result<(), String>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -191,6 +195,8 @@ impl App {
                 selected_device_type: None,
                 device_managers,
                 tray_text_mode,
+                device_id_status: check_device_id_status(),
+                device_id_configuring: false,
             },
             Task::batch(vec![open_task, wait_task]),
         )
@@ -597,6 +603,26 @@ impl App {
                 std::fs::write(app_settings_path, settings.to_string()).ok();
                 Task::none()
             }
+            Message::ConfigureDeviceId => {
+                self.device_id_configuring = true;
+                Task::perform(
+                    async { configure_device_id() },
+                    Message::DeviceIdConfigResult,
+                )
+            }
+            Message::DeviceIdConfigResult(result) => {
+                self.device_id_configuring = false;
+                match result {
+                    Ok(()) => {
+                        self.device_id_status = check_device_id_status();
+                        debug!("DeviceID configured successfully");
+                    }
+                    Err(e) => {
+                        error!("Failed to configure DeviceID: {}", e);
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -994,11 +1020,141 @@ impl App {
                                 ]
                                 .spacing(12);
 
+                            // Seamless Switching section
+                            let (status_text, status_color, show_button) = match &self.device_id_status {
+                                DeviceIdStatus::Configured => (
+                                    "Configured - seamless switching enabled".to_string(),
+                                    iced::Color::from_rgb(0.2, 0.8, 0.2), // Green
+                                    false,
+                                ),
+                                DeviceIdStatus::NotConfigured => (
+                                    "Not configured".to_string(),
+                                    iced::Color::from_rgb(0.9, 0.7, 0.0), // Yellow/Orange
+                                    true,
+                                ),
+                                DeviceIdStatus::WrongValue(v) => (
+                                    format!("Different value: {}", v),
+                                    iced::Color::from_rgb(0.9, 0.7, 0.0), // Yellow/Orange
+                                    true,
+                                ),
+                                DeviceIdStatus::FileNotFound => (
+                                    "BlueZ config not found".to_string(),
+                                    iced::Color::from_rgb(0.8, 0.2, 0.2), // Red
+                                    true,
+                                ),
+                                DeviceIdStatus::ParseError(e) => (
+                                    format!("Error: {}", e),
+                                    iced::Color::from_rgb(0.8, 0.2, 0.2), // Red
+                                    false,
+                                ),
+                            };
+
+                            let configure_button: Element<'_, Message> = if show_button && !self.device_id_configuring {
+                                button(
+                                    text("Configure").size(14)
+                                )
+                                .on_press(Message::ConfigureDeviceId)
+                                .padding(Padding {
+                                    top: 8.0,
+                                    bottom: 8.0,
+                                    left: 16.0,
+                                    right: 16.0,
+                                })
+                                .style(|theme: &Theme, status| {
+                                    let palette = theme.palette();
+                                    match status {
+                                        button::Status::Active => Style {
+                                            background: Some(Background::Color(palette.primary)),
+                                            text_color: palette.background,
+                                            border: Border::default().rounded(8),
+                                            ..Style::default()
+                                        },
+                                        button::Status::Hovered => Style {
+                                            background: Some(Background::Color(palette.primary.scale_alpha(0.8))),
+                                            text_color: palette.background,
+                                            border: Border::default().rounded(8),
+                                            ..Style::default()
+                                        },
+                                        _ => Style::default(),
+                                    }
+                                })
+                                .into()
+                            } else if self.device_id_configuring {
+                                text("Configuring...").size(14).into()
+                            } else {
+                                Space::with_width(Length::Shrink).into()
+                            };
+
+                            let seamless_switching_section = column![
+                                container(
+                                    text("Seamless Switching").size(20).style(
+                                        |theme: &Theme| {
+                                            let mut style = text::Style::default();
+                                            style.color = Some(theme.palette().primary);
+                                            style
+                                        }
+                                    )
+                                )
+                                .padding(Padding {
+                                    top: 0.0,
+                                    bottom: 0.0,
+                                    left: 18.0,
+                                    right: 18.0,
+                                }),
+                                container(
+                                    column![
+                                        row![
+                                            text(status_text).size(14).style(move |_theme: &Theme| {
+                                                let mut style = text::Style::default();
+                                                style.color = Some(status_color);
+                                                style
+                                            }),
+                                            Space::with_width(Length::Fill),
+                                            configure_button
+                                        ]
+                                        .align_y(Center),
+                                        Space::with_height(Length::from(8)),
+                                        text("Enable seamless audio switching between your iPhone and this Linux device. When enabled, AirPods will automatically switch audio to whichever device starts playing.")
+                                            .size(12)
+                                            .style(|theme: &Theme| {
+                                                let mut style = text::Style::default();
+                                                style.color = Some(theme.palette().text.scale_alpha(0.7));
+                                                style
+                                            }),
+                                        Space::with_height(Length::from(8)),
+                                        text("Note: After configuring, restart bluetooth (sudo systemctl restart bluetooth) and re-pair your AirPods.")
+                                            .size(11)
+                                            .style(|theme: &Theme| {
+                                                let mut style = text::Style::default();
+                                                style.color = Some(theme.palette().text.scale_alpha(0.5));
+                                                style
+                                            })
+                                    ]
+                                )
+                                .padding(Padding {
+                                    top: 12.0,
+                                    bottom: 12.0,
+                                    left: 18.0,
+                                    right: 18.0,
+                                })
+                                .style(|theme: &Theme| {
+                                    let mut style = container::Style::default();
+                                    style.background = Some(Background::Color(theme.palette().primary.scale_alpha(0.1)));
+                                    let mut border = Border::default();
+                                    border.color = theme.palette().primary.scale_alpha(0.5);
+                                    style.border = border.rounded(16);
+                                    style
+                                })
+                            ]
+                            .spacing(12);
+
                             container(
                                 column![
                                     appearance_settings_col,
                                     Space::with_height(Length::from(20)),
-                                    tray_text_mode_toggle
+                                    tray_text_mode_toggle,
+                                    Space::with_height(Length::from(20)),
+                                    seamless_switching_section
                                 ]
                             )
                                 .padding(20)
