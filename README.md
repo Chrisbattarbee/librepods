@@ -52,6 +52,70 @@ new version in development ([#241](https://github.com/kavishdevar/librepods/pull
 
 ![new version](https://github.com/user-attachments/assets/86b3c871-89a8-4e49-861a-5119de1e1d28)
 
+#### NixOS Installation
+
+This fork includes a `flake.nix` for easy installation on NixOS.
+
+**Quick test:**
+```bash
+nix run github:Chrisbattarbee/librepods
+```
+
+**Adding to your NixOS configuration:**
+
+1. Add librepods as a flake input in your `flake.nix`:
+```nix
+inputs = {
+  # ... your other inputs
+  librepods = {
+    url = "github:Chrisbattarbee/librepods";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+};
+```
+
+2. Add an overlay to expose the package (in your NixOS or home-manager config):
+```nix
+nixpkgs.overlays = [
+  (final: prev: {
+    librepods = inputs.librepods.packages.${final.system}.default;
+  })
+];
+```
+
+3. Add to your packages:
+```nix
+home.packages = with pkgs; [
+  librepods
+];
+```
+
+4. (Optional) Auto-start with your graphical session via home-manager:
+```nix
+systemd.user.services.librepods = {
+  Unit = {
+    Description = "LibrePods - AirPods features on Linux";
+    After = [ "graphical-session-pre.target" ];
+    PartOf = [ "graphical-session.target" ];
+  };
+  Service = {
+    Type = "simple";
+    ExecStart = "${pkgs.librepods}/bin/librepods";
+    Restart = "on-failure";
+    RestartSec = "5";
+  };
+  Install = {
+    WantedBy = [ "graphical-session.target" ];
+  };
+};
+```
+
+After rebuilding (`sudo nixos-rebuild switch --flake .`), the service will auto-start on login. You can also manually control it:
+```bash
+systemctl --user start librepods
+systemctl --user status librepods
+```
+
 ### Android
 
 #### Screenshots
