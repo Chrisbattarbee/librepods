@@ -90,31 +90,28 @@ home.packages = with pkgs; [
 ];
 ```
 
-4. (Optional) Auto-start with your graphical session via home-manager:
+4. (Optional) Auto-start with your graphical session:
+
+**For Hyprland** (add to your Hyprland config's `exec-once`):
 ```nix
-systemd.user.services.librepods = {
-  Unit = {
-    Description = "LibrePods - AirPods features on Linux";
-    After = [ "graphical-session-pre.target" ];
-    PartOf = [ "graphical-session.target" ];
-  };
-  Service = {
-    Type = "simple";
-    ExecStart = "${pkgs.librepods}/bin/librepods";
-    Restart = "on-failure";
-    RestartSec = "5";
-  };
-  Install = {
-    WantedBy = [ "graphical-session.target" ];
-  };
-};
+wayland.windowManager.hyprland.settings.exec-once = [
+  "sleep 3 && ${pkgs.librepods}/bin/librepods --start-minimized"
+];
+```
+Note: The sleep delay ensures D-Bus is ready before librepods starts.
+
+**For desktop environments with XDG autostart support** (GNOME, KDE, etc.):
+```nix
+xdg.configFile."autostart/librepods.desktop".text = ''
+  [Desktop Entry]
+  Type=Application
+  Name=LibrePods
+  Exec=${pkgs.librepods}/bin/librepods --start-minimized
+  X-GNOME-Autostart-enabled=true
+'';
 ```
 
-After rebuilding (`sudo nixos-rebuild switch --flake .`), the service will auto-start on login. You can also manually control it:
-```bash
-systemctl --user start librepods
-systemctl --user status librepods
-```
+After rebuilding (`sudo nixos-rebuild switch --flake .`), LibrePods will auto-start on login.
 
 ### Android
 
