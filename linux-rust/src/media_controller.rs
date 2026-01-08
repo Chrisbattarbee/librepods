@@ -43,6 +43,7 @@ struct MediaControllerState {
     local_mac: String,
     is_playing: bool,
     paused_by_app_services: Vec<String>,
+    last_toggled_service: Option<String>,
     device_index: Option<u32>,
     cached_a2dp_profile: String,
     old_in_ear_data: Vec<bool>,
@@ -62,6 +63,7 @@ impl MediaControllerState {
             local_mac: String::new(),
             is_playing: false,
             paused_by_app_services: Vec::new(),
+            last_toggled_service: None,
             device_index: None,
             cached_a2dp_profile: String::new(),
             old_in_ear_data: vec![false, false],
@@ -545,12 +547,17 @@ impl MediaController {
     pub async fn toggle_play_pause(&self) {
         debug!("Toggling play/pause");
 
-        tokio::task::spawn_blocking(|| {
+        let last_toggled = {
+            let state = self.state.lock().await;
+            state.last_toggled_service.clone()
+        };
+
+        let toggled_service = tokio::task::spawn_blocking(move || {
             let conn = match Connection::new_session() {
                 Ok(c) => c,
                 Err(e) => {
                     error!("Failed to connect to D-Bus session: {}", e);
-                    return;
+                    return None;
                 }
             };
             let proxy = conn.with_proxy(
@@ -558,25 +565,67 @@ impl MediaController {
                 "/org/freedesktop/DBus",
                 Duration::from_secs(5),
             );
-            let names: Vec<String> = match proxy.method_call("org.freedesktop.DBus", "ListNames", ())
-            {
-                Ok((n,)) => n,
-                Err(e) => {
-                    error!("Failed to list D-Bus names: {}", e);
-                    return;
-                }
-            };
+            let names: Vec<String> =
+                match proxy.method_call("org.freedesktop.DBus", "ListNames", ()) {
+                    Ok((n,)) => n,
+                    Err(e) => {
+                        error!("Failed to list D-Bus names: {}", e);
+                        return None;
+                    }
+                };
 
-            for service in names {
-                if !service.starts_with("org.mpris.MediaPlayer2.") {
-                    continue;
-                }
-                if Self::is_kdeconnect_service(&service) {
-                    continue;
-                }
+            // Filter to MPRIS services only
+            let mpris_services: Vec<&String> = names
+                .iter()
+                .filter(|s| {
+                    s.starts_with("org.mpris.MediaPlayer2.")
+                        && !Self::is_kdeconnect_service(s)
+                })
+                .collect();
 
+            // Priority 1: Find a currently playing service and pause it
+            for service in &mpris_services {
                 let proxy =
-                    conn.with_proxy(&service, "/org/mpris/MediaPlayer2", Duration::from_secs(5));
+                    conn.with_proxy(*service, "/org/mpris/MediaPlayer2", Duration::from_secs(5));
+                if let Ok(playback_status) =
+                    proxy.get::<String>("org.mpris.MediaPlayer2.Player", "PlaybackStatus")
+                    && playback_status == "Playing"
+                    && proxy
+                        .method_call::<(), _, &str, &str>(
+                            "org.mpris.MediaPlayer2.Player",
+                            "PlayPause",
+                            (),
+                        )
+                        .is_ok()
+                {
+                    info!("Paused currently playing: {}", service);
+                    return Some((*service).clone());
+                }
+            }
+
+            // Priority 2: Try the last-toggled service (to resume it)
+            if let Some(ref last) = last_toggled
+                && mpris_services.contains(&last)
+            {
+                let proxy =
+                    conn.with_proxy(last, "/org/mpris/MediaPlayer2", Duration::from_secs(5));
+                if proxy
+                    .method_call::<(), _, &str, &str>(
+                        "org.mpris.MediaPlayer2.Player",
+                        "PlayPause",
+                        (),
+                    )
+                    .is_ok()
+                {
+                    info!("Resumed last-toggled service: {}", last);
+                    return Some(last.clone());
+                }
+            }
+
+            // Priority 3: Fall back to first available service
+            for service in &mpris_services {
+                let proxy =
+                    conn.with_proxy(*service, "/org/mpris/MediaPlayer2", Duration::from_secs(5));
                 if proxy
                     .method_call::<(), _, &str, &str>(
                         "org.mpris.MediaPlayer2.Player",
@@ -586,12 +635,20 @@ impl MediaController {
                     .is_ok()
                 {
                     info!("Toggled play/pause for: {}", service);
-                    break; // Only toggle one player
+                    return Some((*service).clone());
                 }
             }
+
+            None
         })
         .await
-        .unwrap();
+        .unwrap_or(None);
+
+        // Update last_toggled_service if we successfully toggled something
+        if let Some(service) = toggled_service {
+            let mut state = self.state.lock().await;
+            state.last_toggled_service = Some(service);
+        }
     }
 
     async fn resume(&self) {
