@@ -207,6 +207,28 @@ pub enum StemPressBudType {
     Right = 0x02,
 }
 
+impl StemPressType {
+    fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0x05 => Some(Self::SinglePress),
+            0x06 => Some(Self::DoublePress),
+            0x07 => Some(Self::TriplePress),
+            0x08 => Some(Self::LongPress),
+            _ => None,
+        }
+    }
+}
+
+impl StemPressBudType {
+    fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0x01 => Some(Self::Left),
+            0x02 => Some(Self::Right),
+            _ => None,
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioSourceType {
@@ -283,6 +305,7 @@ pub enum AACPEvent {
     AudioSource(AudioSource),
     ConnectedDevices(Vec<ConnectedDevice>, Vec<ConnectedDevice>),
     OwnershipToFalseRequest,
+    StemPress(StemPressType, StemPressBudType),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -795,7 +818,27 @@ impl AACPManager {
                     error!("Failed to save devices: {}", e);
                 }
             }
-            opcodes::STEM_PRESS => info!("Received Stem Press packet."),
+            opcodes::STEM_PRESS => {
+                if packet.len() >= 8 {
+                    if let (Some(press_type), Some(bud_type)) = (
+                        StemPressType::from_u8(packet[6]),
+                        StemPressBudType::from_u8(packet[7]),
+                    ) {
+                        info!("Stem Press: {:?} on {:?}", press_type, bud_type);
+                        let state = self.state.lock().await;
+                        if let Some(ref tx) = state.event_tx {
+                            let _ = tx.send(AACPEvent::StemPress(press_type, bud_type));
+                        }
+                    } else {
+                        debug!(
+                            "Unknown stem press values: type={:#04x}, bud={:#04x}",
+                            packet[6], packet[7]
+                        );
+                    }
+                } else {
+                    error!("Stem Press packet too short: {}", hex::encode(packet));
+                }
+            }
             opcodes::AUDIO_SOURCE => {
                 if payload.len() < 9 {
                     error!("Audio Source packet too short: {}", hex::encode(payload));

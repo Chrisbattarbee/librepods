@@ -1,5 +1,5 @@
 use crate::bluetooth::aacp::ControlCommandIdentifiers;
-use crate::bluetooth::aacp::{AACPEvent, AACPManager, AirPodsLEKeys, ProximityKeyType};
+use crate::bluetooth::aacp::{AACPEvent, AACPManager, AirPodsLEKeys, ProximityKeyType, StemPressType};
 use crate::media_controller::MediaController;
 use crate::ui::messages::BluetoothUIMessage;
 use crate::ui::tray::MyTray;
@@ -68,6 +68,14 @@ impl AirPodsDevice {
             .await
         {
             error!("Failed to request proximity keys: {}", e);
+        }
+
+        info!("Enabling raw gestures (single press)");
+        if let Err(e) = aacp_manager
+            .send_control_command(ControlCommandIdentifiers::StemConfig, &[0x01, 0, 0, 0])
+            .await
+        {
+            error!("Failed to enable raw gestures: {}", e);
         }
 
         let session = bluer::Session::new()
@@ -314,6 +322,18 @@ impl AirPodsDevice {
                         let controller = mc_clone.lock().await;
                         controller.pause_all_media().await;
                         controller.deactivate_a2dp_profile().await;
+                    }
+                    AACPEvent::StemPress(press_type, bud_type) => {
+                        info!("Stem press received: {:?} on {:?}", press_type, bud_type);
+                        if press_type == StemPressType::SinglePress {
+                            let controller = mc_clone.lock().await;
+                            controller.toggle_play_pause().await;
+                        }
+                        // Forward to UI
+                        let _ = ui_tx_clone.send(BluetoothUIMessage::AACPUIEvent(
+                            mac_address.to_string(),
+                            event_clone,
+                        ));
                     }
                     _ => {
                         debug!("Received unhandled AACP event: {:?}", event);

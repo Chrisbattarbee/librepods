@@ -542,6 +542,58 @@ impl MediaController {
         }
     }
 
+    pub async fn toggle_play_pause(&self) {
+        debug!("Toggling play/pause");
+
+        tokio::task::spawn_blocking(|| {
+            let conn = match Connection::new_session() {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to connect to D-Bus session: {}", e);
+                    return;
+                }
+            };
+            let proxy = conn.with_proxy(
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                Duration::from_secs(5),
+            );
+            let names: Vec<String> = match proxy.method_call("org.freedesktop.DBus", "ListNames", ())
+            {
+                Ok((n,)) => n,
+                Err(e) => {
+                    error!("Failed to list D-Bus names: {}", e);
+                    return;
+                }
+            };
+
+            for service in names {
+                if !service.starts_with("org.mpris.MediaPlayer2.") {
+                    continue;
+                }
+                if Self::is_kdeconnect_service(&service) {
+                    continue;
+                }
+
+                let proxy =
+                    conn.with_proxy(&service, "/org/mpris/MediaPlayer2", Duration::from_secs(5));
+                if proxy
+                    .method_call::<(), _, &str, &str>(
+                        "org.mpris.MediaPlayer2.Player",
+                        "PlayPause",
+                        (),
+                    )
+                    .is_ok()
+                {
+                    info!("Toggled play/pause for: {}", service);
+                    break; // Only toggle one player
+                }
+            }
+        })
+        .await
+        .unwrap();
+    }
+
     async fn resume(&self) {
         debug!("Entering resume method");
         debug!("Resuming playback");
