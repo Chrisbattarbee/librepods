@@ -146,6 +146,15 @@ Turns out, if you change the VendorID in DID Profile to that of Apple, you get a
 
 You can do this on Linux by editing the DeviceID in `/etc/bluetooth/main.conf`. Add this line to the config file `DeviceID = bluetooth:004C:0000:0000`. For android you can enable the `act as Apple device` setting in the app's settings.
 
+**NixOS**: Add this to your system configuration:
+```nix
+hardware.bluetooth.settings = {
+  General = {
+    DeviceID = "bluetooth:004C:0000:0000";
+  };
+};
+```
+
 ### Multi-device Connectivity
 
 Upto two devices can be simultaneously connected to AirPods, for audio and control both. Seamless connection switching. The same notification shows up on Apple device when Android takes over the AirPods as if it were an Apple device ("Move to iPhone"). Android also shows a popup when the other device takes over.
